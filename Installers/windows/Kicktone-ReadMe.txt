@@ -28,10 +28,9 @@ Updates
 Run the new installer. It replaces the installed version, and projects saved
 with earlier versions open unchanged.
 
-Kicktone was called Tailtone before version 0.5.29. It is the same plugin:
-projects made with Tailtone open in Kicktone with all their settings, and
-the installer removes the old Tailtone.vst3 so your DAW lists it only once.
-In FL Studio, rescan your plugins once to see the new name.
+Kicktone was called Tailtone before version 0.5.29. The installer removes the
+old Tailtone.vst3 so your DAW lists the plugin only once. In FL Studio, rescan
+your plugins once to see the new name.
 
 Windows SmartScreen
 -------------------

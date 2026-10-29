@@ -7,8 +7,8 @@ play, shape and export.
 
 By **Jei Audio** (Jeipster). Free software under the GNU GPL v3.
 
-Kicktone was called **Tailtone** before version 0.5.29. It is the same plugin:
-projects made with Tailtone open in Kicktone with all their settings.
+Kicktone was called **Tailtone** before version 0.5.29 (never released
+publicly under that name).
 
 > **Beta.** Kicktone is still in development. Please report crashes or
 > anything that sounds wrong to **Jeiaudio.project@gmail.com** or open an
