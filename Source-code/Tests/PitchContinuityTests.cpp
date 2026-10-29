@@ -21,7 +21,7 @@ static double bodyFrequency(const pt::Sample& y,double stretch) {
 // fixed window above holds only ~2.5 cycles of the 22 Hz body. Measure that one
 // combination over >= 5 target cycles with period-scaled smoothing and use the
 // median cycle period. Its longest single cycle is reported (one whole-cycle
-// splice there is ~20% long) - see KNOWN LIMITS in README-v0.4.61.txt.
+// splice there is ~20% long): a known limit of the engine, printed, not hidden.
 static std::vector<double> bodyPeriods(const pt::Sample& y,double stretch,double targetHz) {
     bool armed=false; std::vector<double> crossings,periods;
     const int radius=(std::max)(22,int(std::lround(y.rate/targetHz/16.0)));

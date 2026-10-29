@@ -8,7 +8,7 @@
 // render: the per-note code is unchanged, only the order in which notes are
 // computed differs, and the results are written to fixed slots.
 //
-// Rules kept from AGENTS.md: this runs only on the preparation worker (the
+// Rules: this runs only on the preparation worker (the
 // worker thread blocks here until every task has finished), never in the
 // audio callback; no shared mutable state is touched by the tasks except
 // their own output slot; cancellation is polled between notes as before.

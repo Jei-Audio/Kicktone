@@ -1,5 +1,9 @@
-Bundled JUCE: carried forward unchanged from PunchTail v0.3.0.
-r8brain-free-src: unmodified source from https://github.com/avaneev/r8brain-free-src
-  (master branch downloaded on the first CMake configure; MIT license).
-Rubber Band dependency removed from v0.4.0; prior R3 version remains separately available.
-No r8brain source or test shim is bundled in this archive.
+Bundled third-party source (licences: ../THIRD-PARTY.md)
+
+JUCE 7.0.12 (JUCE/): official release, not modified for Kicktone. Includes the Steinberg
+  VST3 SDK 3.7.8 under juce_audio_processors/format_types/VST3_SDK.
+r8brain-free-src (r8brain/): unmodified core headers and FFT source from
+  https://github.com/avaneev/r8brain-free-src (master archive retrieved
+  2026-10-11), MIT licence. Provenance in r8brain/SOURCE.txt.
+Toolchain-Licenses/LLVM.txt: licence of the LLVM-MinGW toolchain used only by
+  the optional Linux cross-build (scripts/CrossBuild.py).
