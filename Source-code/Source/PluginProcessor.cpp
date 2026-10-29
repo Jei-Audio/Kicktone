@@ -1930,7 +1930,9 @@ void PunchTailProcessor::rebuildPunch() {
         const double splitAt=std::clamp(ls.split,0.0,1.0)*audible;
         const double fade=(std::max)(ls.transition*outScale,1.0/rate);
         const bool sameScale=outScale==addScale;
-        const double offset=ls.offset*rate*(sameScale?1.0:addScale);   // +: later audio from Punch 2
+        // v0.5.31: + moves Punch 2 RIGHT (heard later, earlier audio from the file),
+        // - moves it left. Before v0.5.31 the sign was the other way round.
+        const double offset=-ls.offset*rate*(sameScale?1.0:addScale);
         // Punch 2 enters at the source time where Punch 1 is at the split, then plays at its own rate.
         const double splitIndex=splitAt*rate, entry=sameScale?0.0:splitIndex*(addScale/outScale)-splitIndex;
         for(size_t i=0;i<out.left.size();++i){
@@ -2494,6 +2496,16 @@ void PunchTailProcessor::setStateInformation(const void* data,int size) {
     };
     force("pitchCharacter",1);force("pitchExtreme",1);force("pitchQuality",1);force("pitchCrunch",0);
     force("glideStretched",1);   // v0.5.25: glide is always stretched (inert placeholder)
+    {   // v0.5.31: PUNCH 2 OFFSET was reversed (+ now moves Punch 2 right). Projects
+        // saved before that keep their sound: their stored offset changes sign.
+        juce::StringArray parts;parts.addTokens(tree.getProperty("savedWithVersion").toString(),".","");
+        const int v[3]={parts[0].getIntValue(),parts[1].getIntValue(),parts[2].getIntValue()};
+        const bool beforeFlip=v[0]!=0?false:v[1]<5||(v[1]==5&&v[2]<31);
+        if(parts.size()<2 || beforeFlip)
+            for(int child=0;child<tree.getNumChildren();++child)
+                if(auto value=tree.getChild(child);value.getProperty("id").toString()=="punch2Offset" && float(value.getProperty("value"))!=0.f)
+                    value.setProperty("value",-float(value.getProperty("value")),nullptr);
+    }
     params.replaceState(tree);
     { const juce::ScopedLock l(assetLock);
         for(const auto& a:assets) if(a) retiredAssets.push_back(a);

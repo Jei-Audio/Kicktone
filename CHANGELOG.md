@@ -5,6 +5,11 @@ same plugin (plugin code `TaA2`).
 A new version replaces the installed one, and projects from earlier versions
 open unchanged.
 
+## 0.5.31
+- PUNCH 2 OFFSET now moves the way you drag: right (+) moves Punch 2 later,
+  left (-) moves it earlier. Projects saved with an earlier version are
+  converted when they open, so they sound the same as before.
+
 ## 0.5.30
 - Every EQ starts neutral in a new Kicktone, also when you have saved your own
   default settings: SAVE CURRENT on the Defaults page no longer stores EQ bands

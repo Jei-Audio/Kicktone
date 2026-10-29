@@ -290,13 +290,14 @@ struct TailtoneGlideLayerTest {
         juce::Thread::sleep(1);}throw std::runtime_error(why);};
     prepared=wait2("Split change did not rebuild");
     check(std::abs(prepared->sample.left[2000]-punch->sample.left[2000])<1e-6f&&std::abs(prepared->sample.left[2300]-longer->sample.left[2300])<1e-6f,"Attack End did not move the meeting point");
-    // Punch 2 Offset +10 ms: uses Punch 2 audio 441 frames later.
+    // v0.5.31 direction: Punch 2 Offset +10 ms moves Punch 2 RIGHT (441 frames later
+    // in time, so the output plays Punch 2 audio from 441 frames earlier).
     set(p,"punch2Offset",10);
     prepared=wait2("Offset change did not rebuild");
-    check(std::abs(prepared->sample.left[3000]-longer->sample.left[3441])<1e-6f,"Positive offset must use later Punch 2 audio");
+    check(std::abs(prepared->sample.left[3000]-longer->sample.left[3000-441])<1e-6f,"Positive offset must move Punch 2 later (right)");
     set(p,"punch2Offset",-25);
     prepared=wait2("Negative offset did not rebuild");
-    check(std::abs(prepared->sample.left[3000]-longer->sample.at(0,3000.0-1102.5))<1e-5f,"Negative offset must use earlier Punch 2 audio");
+    check(std::abs(prepared->sample.left[3000]-longer->sample.at(0,3000.0+1102.5))<1e-5f,"Negative offset must move Punch 2 earlier (left)");
     check(p.params.getParameter("punch2Offset")->getNormalisableRange().start==-25&&p.params.getParameter("punch2Offset")->getNormalisableRange().end==25,"Offset range must be -25..+25 ms");
     set(p,"punch2Offset",0);set(p,"punchRegionSplit",20);
     prepared=wait2("Reset did not rebuild");
@@ -440,6 +441,23 @@ struct TailtoneGlideLayerTest {
     check(r.params.getRawParameterValue("glideStretched")->load()>.5f,"Loaded projects must reset the inert glideStretched placeholder to ON");
     check(r.params.getRawParameterValue("punchLayer")->load()<.5f&&r.params.getRawParameterValue("glide")->load()<.5f,"Old projects must load with Glide and Punch layer unticked");
     check(p.params.getParameter("glideTime")->getParameterIndex()>p.params.getParameter("lowKeyPunch")->getParameterIndex(),"New parameters not appended");
+    // v0.5.31: PUNCH 2 OFFSET was reversed. Projects saved before it flip the stored
+    // sign (same sound); projects saved now keep their value.
+    {auto saveOffset=[&](const juce::var& version,float ms){auto t=juce::ValueTree::readFromData(saved.getData(),saved.getSize());
+        if(version.isVoid())t.removeProperty("savedWithVersion",nullptr);else t.setProperty("savedWithVersion",version,nullptr);
+        for(int i=0;i<t.getNumChildren();++i)if(t.getChild(i).getProperty("id").toString()=="punch2Offset")t.getChild(i).setProperty("value",ms,nullptr);
+        juce::MemoryBlock b;{juce::MemoryOutputStream stream(b,false);t.writeToStream(stream);}
+        auto s=std::make_unique<PunchTailProcessor>();stop(*s);s->setStateInformation(b.getData(),int(b.getSize()));
+        return s->params.getRawParameterValue("punch2Offset")->load();};
+     check(std::abs(saveOffset("0.5.30",7.5f)+7.5f)<1e-4f,"A v0.5.30 project must load its Punch 2 offset with the sign flipped");
+     check(std::abs(saveOffset("0.4.69",-12.f)-12.f)<1e-4f,"A v0.4.69 project must load its Punch 2 offset with the sign flipped");
+     check(std::abs(saveOffset(juce::var(),3.f)+3.f)<1e-4f,"A project without savedWithVersion must flip the Punch 2 offset");
+     check(std::abs(saveOffset("0.5.31",7.5f)-7.5f)<1e-4f,"A v0.5.31 project must keep its Punch 2 offset");
+     check(std::abs(saveOffset("0.6.0",-4.f)+4.f)<1e-4f,"A newer project must keep its Punch 2 offset");
+     check(saveOffset("0.5.30",0.f)==0.f,"A zero Punch 2 offset must stay zero");
+     juce::MemoryBlock now;auto again=std::make_unique<PunchTailProcessor>();stop(*again);
+     set(r,"punch2Offset",9);r.getStateInformation(now);again->setStateInformation(now.getData(),int(now.getSize()));
+     check(std::abs(again->params.getRawParameterValue("punch2Offset")->load()-9.f)<.02f,"Punch 2 offset must round-trip unchanged in a new project");}
     stop(p);stop(q);stop(r);file.deleteFile();
  }
 };
@@ -450,6 +468,6 @@ int main() try {
     TailtoneGlideLayerTest::stretched();
     TailtoneGlideLayerTest::layer();
     TailtoneGlideLayerTest::state();
-    std::cout<<"PASS legato glide (slide, no punch/retrigger, no click, key-owned note-off, time), Punch layer (unticked silent, summed within Punch length, resampled, key lanes, untick), Punch 2 file/state, defaults/migration, stretched glide always on (timeline, pitch curve, aligned steps, retrigger, adaptive, inert switch)\n";
+    std::cout<<"PASS legato glide (slide, no punch/retrigger, no click, key-owned note-off, time), Punch layer (unticked silent, summed within Punch length, resampled, key lanes, untick), Punch 2 file/state, offset direction + pre-v0.5.31 migration, defaults/migration, stretched glide always on (timeline, pitch curve, aligned steps, retrigger, adaptive, inert switch)\n";
     return 0;
 } catch(const std::exception& e) { std::cerr<<"FAIL "<<e.what()<<'\n'; return 1; }

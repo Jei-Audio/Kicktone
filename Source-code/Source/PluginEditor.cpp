@@ -1229,7 +1229,7 @@ PunchTailEditor::PunchTailEditor(PunchTailProcessor& p)
     punch2OffsetLabel.setText("OFFSET",juce::dontSendNotification);punch2OffsetLabel.setFont(juce::Font(11.0f,juce::Font::bold));
     punch2Offset.setSliderStyle(juce::Slider::LinearHorizontal);punch2Offset.setTextBoxStyle(juce::Slider::TextBoxRight,false,72,22);
     punch2Offset.setTextValueSuffix(" ms");punch2Offset.enableStepButtons(0.1);
-    punch2Offset.setTooltip("Which part of Punch 2 you hear after the split, -25 to +25 ms. Positive = later in the file, negative = earlier. Where the two punches meet is set by ATTACK END and TRANSITION in Punch Attack / Decay.");
+    punch2Offset.setTooltip("Slides Punch 2 left or right in time, -25 to +25 ms. Drag right (+) to move it later, left (-) to move it earlier. Where the two punches meet is set by ATTACK END and TRANSITION in Punch Attack / Decay.");
     punch2OffsetAttachment=std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.params,"punch2Offset",punch2Offset);
     content.addAndMakeVisible(punch2Pitch);content.addAndMakeVisible(punch2PitchLabel);
     punch2PitchLabel.setText("TUNE",juce::dontSendNotification);punch2PitchLabel.setFont(juce::Font(11.0f,juce::Font::bold));
