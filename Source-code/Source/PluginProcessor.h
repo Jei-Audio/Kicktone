@@ -211,7 +211,7 @@ public:
     bool hasEditor() const override { return true; }
     // v0.5: permanent DAW-visible name (= PRODUCT_NAME). The version is shown in
     // the editor and About page, never in the name, so hosts keep recognising it.
-    const juce::String getName() const override { return "Tailtone"; }
+    const juce::String getName() const override { return "Kicktone"; }
     static juce::String versionString() { return JucePlugin_VersionString; }
     // v0.5.22 (user request): the UI size is SHOWN relative to the default size,
     // so the stored uiScale 75 reads "100%". Display only; the parameter keeps
@@ -360,7 +360,7 @@ public:
     // process on the computer (bridged / separate-process plugins). Plugin
     // instances use them; tests construct processors without a host wrapper.
     static pt::parallel::SystemSlots& namedPreparationSlots();
-    static juce::String waitingForTurnText() { return "Waiting for another Tailtone to finish preparing (instances take turns to keep the CPU low)..."; }
+    static juce::String waitingForTurnText() { return "Waiting for another Kicktone to finish preparing (instances take turns to keep the CPU low)..."; }
 private:
     struct Request { bool pending=false; juce::File file; juce::MemoryBlock bytes; juce::String name; bool fromState=false; uint64_t generation=0; bool trimSilence=false; int trimFirst=0, trimLast=-1; };
     std::array<Request,4> requests;

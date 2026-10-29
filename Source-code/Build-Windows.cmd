@@ -1,10 +1,10 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-title Tailtone - Visual Studio 2026 VST3 Build
+title Kicktone - Visual Studio 2026 VST3 Build
 
 rem ==========================================================================
-rem  Tailtone Windows build (v0.5.6 onward: fast incremental builds)
+rem  Kicktone Windows build (v0.5.6 onward: fast incremental builds)
 rem
 rem    BUILD-WINDOWS.cmd            quick: only what changed, VST3 + standalone,
 rem                                 no tests, then installs the VST3 (default)
@@ -27,7 +27,7 @@ if /I not "%MODE%"=="quick" if /I not "%MODE%"=="full" if /I not "%MODE%"=="clea
 )
 
 echo ==========================================================
-echo   Tailtone - Windows VST3 build for VS 2026  (%MODE%)
+echo   Kicktone - Windows VST3 build for VS 2026  (%MODE%)
 echo ==========================================================
 echo.
 
@@ -57,7 +57,7 @@ set "BUILD_DIR=%LOCALAPPDATA%\JeiAudio\Tailtone"
 set "JUCE_TOOLS_DIR=%BUILD_DIR%"
 set "CMAKE_GENERATOR=Visual Studio 18 2026"
 set "CMAKE_GENERATOR_PLATFORM=x64"
-echo Tailtone ^(permanent plugin ID TaA2; the version is in CMakeLists.txt^)
+echo Kicktone ^(formerly Tailtone; permanent plugin ID TaA2; the version is in CMakeLists.txt^)
 
 if /I "%MODE%"=="clean" (
     echo Cleaning generated build: "%BUILD_DIR%"
@@ -105,14 +105,14 @@ echo [2b/5] Checking which source files changed ^(by content, not by date^)...
 set "HASH_STATE=%BUILD_DIR%\tailtone-source.sha256"
 if exist "%HASH_STATE%.pending" del /q "%HASH_STATE%.pending"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CMAKE_SRC%\scripts\sync-timestamps.ps1" -Src "%CMAKE_SRC%" -State "%HASH_STATE%"
-if errorlevel 1 echo WARNING: could not compare the source files. If Tailtone crashes after this build, run: BUILD-WINDOWS.cmd clean
+if errorlevel 1 echo WARNING: could not compare the source files. If Kicktone crashes after this build, run: BUILD-WINDOWS.cmd clean
 
 echo.
 if /I "%MODE%"=="quick" (
-    echo [3/5] Compiling Tailtone VST3 and standalone ^(only changed files^)...
+    echo [3/5] Compiling Kicktone VST3 and standalone ^(only changed files^)...
     cmake --build "%BUILD_DIR%" --config Release --target Tailtone_VST3 Tailtone_Standalone --parallel
 ) else (
-    echo [3/5] Compiling Tailtone VST3, standalone and all tests ^(only changed files^)...
+    echo [3/5] Compiling Kicktone VST3, standalone and all tests ^(only changed files^)...
     cmake --build "%BUILD_DIR%" --config Release --target Tailtone_VST3 Tailtone_Standalone TailtoneCpuOptimizationTests TailtoneDecayNoteTests TailtoneIdentityTests TailtoneBassMonoTests TailtoneEqPositionTests TailtoneSplitNormalizeTests TailtoneExtremeV5Tests TailtoneSpectralJoinTests TailtoneParallelRenderTests TailtonePreparationGateTests TailtoneSplitPairTests TailtonePlayedKeysTests TailtonePreparationProgressTests TailtoneAttackLayerTests TailtoneOutputLimiterTests TailtonePitchDropTests TailtonePitchDropIntegrationTests TailtoneWetAlignTests TailtoneTailEndCutTests TailtoneRootRenderPhaseTests TailtoneFormantDuckTests TailtoneGlideLayerTests TailtoneKeyMappingTests TailtoneKickCharacterTests TailtoneKickCharacterIntegrationTests TailtoneManualRootTests TailtoneMasterEnvelopeTests TailtoneMasterEnvelopeIntegrationTests TailtonePunchRegionTests TailtonePunchRegionIntegrationTests TailtoneSubDuckTests TailtoneReverbTests TailtoneReverbPitchTests TailtoneReverbIntegrationTests TailtoneAdaptiveStretchTests TailtoneLinearPhaseTests TailtoneTailWetMonoTests TailtoneLinearIntegrationTests TailtoneJoinTrimTests TailtoneSilenceStateTests TailtonePunchPitchTests TailtoneProcessedPreviewTests TailtonePhaseAlignmentTests TailtonePunchTransientTests TailtoneParametricEQTests TailtoneThreeBusEQTests PunchTailCoreTests PunchTailWaveformTests PunchTailKickOverviewTests PunchTailRealTailTests PunchTailWindowsMacroTests PunchTailBankFallbackTests PunchTailStretchTests PunchTailInterpolationTests PunchTailPlaybackTests PunchTailWaveformEditingTests PunchTailEditorTests PunchTailPitchContinuityTests PunchTailReverbLayerTests PunchTailReverbLowCutTests PunchTailDistortionRoutingTests PunchTailDistortionDSPTests --parallel
 )
 if errorlevel 1 goto build_failed
@@ -131,16 +131,19 @@ if /I "%MODE%"=="quick" (
 echo.
 echo [5/5] Installing the plugin...
 set "PLUGIN="
-for /d %%G in ("%BUILD_DIR%\Tailtone_artefacts\Release\VST3\Tailtone*.vst3") do set "PLUGIN=%%~fG"
+for /d %%G in ("%BUILD_DIR%\Tailtone_artefacts\Release\VST3\Kicktone*.vst3") do set "PLUGIN=%%~fG"
 if not defined PLUGIN goto plugin_missing
 if not exist "%PLUGIN%" goto plugin_missing
 set "INSTALLED=0"
 if defined CommonProgramFiles (
-    robocopy "%PLUGIN%" "%CommonProgramFiles%\VST3\Tailtone.vst3" /MIR /NFL /NDL /NJH /NJS /NP /R:1 /W:1 >nul 2>&1
+    robocopy "%PLUGIN%" "%CommonProgramFiles%\VST3\Kicktone.vst3" /MIR /NFL /NDL /NJH /NJS /NP /R:1 /W:1 >nul 2>&1
     rem v0.5.24: robocopy exits 0 when it cannot open the destination folder at all
     rem ^(no administrator rights^), so compare the installed plugin with the new one.
-    fc /b "%PLUGIN%\Contents\x86_64-win\Tailtone.vst3" "%CommonProgramFiles%\VST3\Tailtone.vst3\Contents\x86_64-win\Tailtone.vst3" >nul 2>&1
+    fc /b "%PLUGIN%\Contents\x86_64-win\Kicktone.vst3" "%CommonProgramFiles%\VST3\Kicktone.vst3\Contents\x86_64-win\Kicktone.vst3" >nul 2>&1
     if not errorlevel 1 set "INSTALLED=1"
+    rem v0.5.29: the plugin was renamed. The old Tailtone.vst3 has the same plugin ID,
+    rem so remove it once Kicktone.vst3 is in place ^(the DAW would list it twice^).
+    if exist "%CommonProgramFiles%\VST3\Kicktone.vst3\Contents\x86_64-win\Kicktone.vst3" if exist "%CommonProgramFiles%\VST3\Tailtone.vst3" rmdir /s /q "%CommonProgramFiles%\VST3\Tailtone.vst3"
 )
 
 echo.
@@ -149,15 +152,16 @@ echo BUILD SUCCEEDED
 echo VST3 location:
 echo   "%PLUGIN%"
 if "%INSTALLED%"=="1" (
-    echo Installed to "%CommonProgramFiles%\VST3\Tailtone.vst3".
+    echo Installed to "%CommonProgramFiles%\VST3\Kicktone.vst3".
     echo FL Studio picks it up on the next plugin scan ^(or reopen the project^).
 ) else (
-    echo Could not copy it to "%CommonProgramFiles%\VST3\Tailtone.vst3" automatically
+    echo Could not copy it to "%CommonProgramFiles%\VST3\Kicktone.vst3" automatically
     echo ^(no permission, or FL Studio has the plugin open^). Close FL Studio and run this
-    echo script as administrator, or copy the Tailtone.vst3 folder there yourself.
+    echo script as administrator, or copy the Kicktone.vst3 folder there yourself.
     echo Or run BUILD-INSTALLER-WINDOWS.cmd skipbuild and install that ^(it asks for permission^).
-    echo Until then your DAW still loads the OLD Tailtone.
+    echo Until then your DAW still loads the OLD version.
 )
+if exist "%CommonProgramFiles%\VST3\Tailtone.vst3" if exist "%CommonProgramFiles%\VST3\Kicktone.vst3" echo NOTE: the old "Tailtone.vst3" is still installed - remove it ^(same plugin ID as Kicktone^).
 if exist "%CommonProgramFiles%\VST3\Tailtone v0.4.69 Experimental.vst3" echo NOTE: "Tailtone v0.4.69 Experimental.vst3" is still installed - remove it ^(same plugin ID^).
 echo ==========================================================
 echo.
@@ -225,7 +229,7 @@ goto failed
 :plugin_missing
 echo ERROR: Build completed but plugin was not found at:
 echo   "%PLUGIN%"
-echo Look for Tailtone.vst3 under "%BUILD_DIR%".
+echo Look for Kicktone.vst3 under "%BUILD_DIR%".
 goto failed
 
 :failed

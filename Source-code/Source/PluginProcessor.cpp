@@ -418,7 +418,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PunchTailProcessor::layout()
 }
 PunchTailProcessor::PunchTailProcessor()
 : AudioProcessor(BusesProperties().withOutput("Stereo",juce::AudioChannelSet::stereo(),true)),
-  Thread("Tailtone sample preparation"), params(*this,nullptr,"PunchTailState",layout()) {
+  Thread("Kicktone sample preparation"), params(*this,nullptr,"PunchTailState",layout()) {
     for(auto& m:playedMask)m.store(0);   // v0.5.15
     const char* controls[]={"punchRegionOn","punchRegionSplit","punchRegionTransition","punchAttackGain","punchDecayGain"};
     for(size_t i=0;i<regionControls.size();++i)regionControls[i]=params.getRawParameterValue(controls[i]);
@@ -1227,10 +1227,10 @@ void PunchTailProcessor::run() {
         rebuildCrunch();
       } catch(const std::exception& e) {
         rebuilding=false;
-        setStatus("Preparation error (Tailtone kept running): "+juce::String(e.what()));
+        setStatus("Preparation error (Kicktone kept running): "+juce::String(e.what()));
       } catch(...) {
         rebuilding=false;
-        setStatus("Preparation error (Tailtone kept running).");
+        setStatus("Preparation error (Kicktone kept running).");
       }
         prepSlot.release();   // v0.5.16: other instances may prepare between passes
         // v0.5.10: come back soon when a render waits for settings to settle; v0.5.15: background batches follow at once;
@@ -1686,7 +1686,7 @@ bool PunchTailProcessor::prepareTailBanks(pt::TailCompositeCache& compositeCache
             if(turnsBusy)progress.setWaiting(true);
             int ready=0;for(int n=pt::kLowestPitchNote;n<=pt::kHighestPitchNote;++n)if(!dryMissing(n)&&!wetMissing(n))++ready;
             setStatus(engine+": "+juce::String(ready)+"/"+juce::String(pt::kPitchNoteCount)+
-                " keys ready; the other keys follow after a few seconds without changes (Tailtone instances take turns to keep the CPU low).");
+                " keys ready; the other keys follow after a few seconds without changes (Kicktone instances take turns to keep the CPU low).");
             return true;
         };
         if(const int waitMs=pt::parallel::preparationGate().backgroundWaitMs();waitMs>0)return deferred(waitMs,false);

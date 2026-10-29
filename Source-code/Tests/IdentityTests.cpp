@@ -2,6 +2,8 @@
 // host: same name, VST3 class ID (manufacturer + plugin code), bundle ID and
 // state format, so a new version replaces the installed one and opens projects
 // saved by earlier ones. The codes are v0.4.69's, so its projects open too.
+// v0.5.29: the product was renamed from Tailtone to Kicktone at the user's
+// request. Only the name changed; the codes, bundle ID and state stay.
 // Never change these expectations to make a release pass.
 #include "../Source/PluginProcessor.h"
 #include <iostream>
@@ -24,14 +26,14 @@ static void checkSettings(PunchTailProcessor& p,const char* what){
 int main()try{
     juce::ScopedJuceInitialiser_GUI init;
     // Host-visible identity.
-    check(std::strcmp(JucePlugin_Name,"Tailtone")==0,"PRODUCT_NAME must stay \"Tailtone\"");
+    check(std::strcmp(JucePlugin_Name,"Kicktone")==0,"PRODUCT_NAME must stay \"Kicktone\" (renamed from Tailtone in v0.5.29)");
     check(JucePlugin_ManufacturerCode==0x4a656941,"Manufacturer code must stay JeiA");
     check(JucePlugin_PluginCode==0x54614132,"Plugin code must stay TaA2 (the VST3 class ID is built from it)");
     check(std::strcmp(TT_STR(JucePlugin_CFBundleIdentifier),"audio.jei.tailtone")==0,"Bundle ID must stay audio.jei.tailtone");
     {const auto v=juce::StringArray::fromTokens(JucePlugin_VersionString,".","");
      check(v.size()==3&&(v[0].getIntValue()>0||v[1].getIntValue()>=5),"Version must be 0.5.0 or later");}
     auto aOwner=std::make_unique<PunchTailProcessor>();auto& a=*aOwner;
-    check(a.getName()=="Tailtone","getName() must stay \"Tailtone\" (no version in the name)");
+    check(a.getName()=="Kicktone","getName() must stay \"Kicktone\" (no version in the name)");
     check(PunchTailProcessor::versionString()==JucePlugin_VersionString,"Version string differs from the build version");
 
     // A project saved by this version opens in the next one.
@@ -58,7 +60,7 @@ int main()try{
 
     // Garbage never changes the current settings.
     {const char junk[]="not a Tailtone state";a.setStateInformation(junk,int(sizeof junk));checkSettings(a,"Invalid state");}
-    std::cout<<"PASS permanent identity: name Tailtone, JeiA/TaA2, audio.jei.tailtone, version "<<JucePlugin_VersionString
+    std::cout<<"PASS permanent identity: name Kicktone, JeiA/TaA2, audio.jei.tailtone, version "<<JucePlugin_VersionString
              <<"; projects from this, older (pre-v0.5) and newer versions load\n";
     return 0;
 }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}

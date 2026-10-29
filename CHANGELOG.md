@@ -1,8 +1,15 @@
 # Changelog
 
-Since v0.5.0 every version is the same plugin (Tailtone, plugin code `TaA2`).
+Kicktone was called Tailtone before 0.5.29. Since v0.5.0 every version is the
+same plugin (plugin code `TaA2`).
 A new version replaces the installed one, and projects from earlier versions
 open unchanged.
+
+## 0.5.29
+- Renamed from Tailtone to **Kicktone**. Same plugin: projects made with
+  Tailtone open in Kicktone with all their settings. The installer removes the
+  old Tailtone.vst3 so the DAW lists the plugin only once. Your theme, custom
+  defaults and Background rendering setting are copied over the first time.
 
 ## 0.5.28
 - The Final Kick waveform follows the mouse at once while you drag the Punch or

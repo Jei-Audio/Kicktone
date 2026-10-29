@@ -43,11 +43,11 @@
 #define JucePlugin_ManufacturerEmail ""
 #define JucePlugin_ManufacturerCode 0x4a656941
 #define JucePlugin_PluginCode 0x54614132
-#define JucePlugin_Name "Tailtone"
-#define JucePlugin_Desc "Tailtone"
-#define JucePlugin_Version 0.5.28
-#define JucePlugin_VersionString "0.5.28"
-#define JucePlugin_VersionCode 0x51c
+#define JucePlugin_Name "Kicktone"
+#define JucePlugin_Desc "Kicktone"
+#define JucePlugin_Version 0.5.29
+#define JucePlugin_VersionString "0.5.29"
+#define JucePlugin_VersionCode 0x51d
 #define JucePlugin_CFBundleIdentifier audio.jei.tailtone
 #define JucePlugin_VSTUniqueID JucePlugin_PluginCode
 #define JucePlugin_VSTCategory kPlugCategSynth

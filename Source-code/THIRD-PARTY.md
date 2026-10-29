@@ -1,7 +1,7 @@
-# Third-party components in Tailtone
+# Third-party components in Kicktone
 
-Tailtone is free software by Jei Audio (Jeipster), released under the GNU
-General Public License v3 (LICENSE.txt). Whoever receives a Tailtone binary is
+Kicktone is free software by Jei Audio (Jeipster), released under the GNU
+General Public License v3 (LICENSE.txt). Whoever receives a Kicktone binary is
 entitled to its complete source code under the same licence.
 
 ## JUCE 7.0.12
@@ -15,7 +15,7 @@ usage reporting are switched off, as the GPL option allows.
 Steinberg Media Technologies GmbH - bundled with JUCE in
 ThirdParty/JUCE/modules/juce_audio_processors/format_types/VST3_SDK and used
 under its GNU GPL v3 option (LICENSE.txt in that folder).
-VST is a registered trademark of Steinberg Media Technologies GmbH. Tailtone
+VST is a registered trademark of Steinberg Media Technologies GmbH. Kicktone
 does not use the VST logo.
 
 ## r8brain-free-src

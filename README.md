@@ -1,13 +1,16 @@
-# Tailtone
+# Kicktone
 
 **A kick instrument for hardstyle, hardcore and other distorted kicks.**
-Load a punch and a tail. Tailtone pitches the tail across the keyboard, lines
+Load a punch and a tail. Kicktone pitches the tail across the keyboard, lines
 it up with the punch at every note and gives you one finished kick that you can
 play, shape and export.
 
 By **Jei Audio** (Jeipster). Free software under the GNU GPL v3.
 
-> **Beta.** Tailtone is still in development. Please report crashes or
+Kicktone was called **Tailtone** before version 0.5.29. It is the same plugin:
+projects made with Tailtone open in Kicktone with all their settings.
+
+> **Beta.** Kicktone is still in development. Please report crashes or
 > anything that sounds wrong to **Jeiaudio.project@gmail.com** or open an
 > issue on GitHub.
 
@@ -15,8 +18,8 @@ By **Jei Audio** (Jeipster). Free software under the GNU GPL v3.
 
 Get the latest version from the **Releases** page:
 
-- `Tailtone-<version>-Windows-Setup.exe`: installer (VST3 plugin and an optional standalone app)
-- `Tailtone-<version>-Windows-VST3.zip`: the plugin on its own, for a manual install
+- `Kicktone-<version>-Windows-Setup.exe`: installer (VST3 plugin and an optional standalone app)
+- `Kicktone-<version>-Windows-VST3.zip`: the plugin on its own, for a manual install
 
 **Requirements:** Windows 10 or 11 (64-bit) and a VST3 host (FL Studio, Ableton
 Live, Reaper, Bitwig, Cubase, Studio One, ...). There are no macOS or Linux
@@ -62,7 +65,7 @@ unchanged.
 
 ## Building from source
 
-Everything Tailtone needs is in this repository (JUCE 7.0.12 and r8brain are
+Everything Kicktone needs is in this repository (JUCE 7.0.12 and r8brain are
 bundled in `Source-code/ThirdParty`).
 
 On Windows, some bundled JUCE paths are long. Turn on long paths in git and
@@ -70,7 +73,7 @@ clone to a short folder, otherwise checkout or the JUCE tool build can fail:
 
 ```bash
 git config --global core.longpaths true
-git clone <repository-url> C:\src\Tailtone
+git clone <repository-url> C:\src\Kicktone
 ```
 
 ### Windows (Visual Studio 2026)
@@ -96,7 +99,7 @@ the installer and the VST3 zip to `Release\`.
 
 ```bash
 cmake -S Source-code -B build
-cmake --build build --config Release --target Tailtone_VST3 Tailtone_Standalone
+cmake --build build --config Release --target Kicktone_VST3 Kicktone_Standalone
 ctest --test-dir build -C Release --output-on-failure
 ```
 
@@ -111,12 +114,12 @@ as **Skipped**. All other tests run normally.
 
 The tests' limits are tuned to those exact recordings, so replacing them with
 other WAV files of the same names can make the tests fail. Point
-`-DTAILTONE_SAMPLES_DIR=<folder>` at a folder with the original files if you
+`-DKICKTONE_SAMPLES_DIR=<folder>` at a folder with the original files if you
 have them, and re-run CMake after adding them.
 
 ## Licence
 
-Tailtone is free software: you can redistribute it and/or modify it under the
+Kicktone is free software: you can redistribute it and/or modify it under the
 terms of the **GNU General Public License version 3** ([LICENSE](LICENSE)).
 It comes with no warranty.
 

@@ -336,17 +336,17 @@ TailtoneAboutPage::TailtoneAboutPage() {
     // v0.4.62 theme selector (saved for all projects on this computer).
     for(size_t i=0;i<tt::ui::palettes().size();++i)themeBox.addItem(tt::ui::palettes()[i].name,int(i)+1);
     themeBox.setSelectedId(tt::ui::themeIndex()+1,juce::dontSendNotification);
-    themeBox.setTooltip("Colours of the Tailtone window. Saved on this computer for all your projects.");
+    themeBox.setTooltip("Colours of the Kicktone window. Saved on this computer for all your projects.");
     themeBox.onChange=[this]{const int id=themeBox.getSelectedId();if(id>0&&onTheme)onTheme(id-1);};
     addAndMakeVisible(themeBox);
     // v0.5.10 PREPARATION CPU, shown as BACKGROUND RENDERING since v0.5.18 (Quiet is labelled Eco).
     prepBox.addItem("Eco (1 core)",1);prepBox.addItem("Balanced (half the cores)",2);prepBox.addItem("Fast (all cores but one)",3);
     prepBox.setSelectedId(tt::ui::prepEffort()+1,juce::dontSendNotification);
-    prepBox.setTooltip("How many CPU cores Tailtone uses to prepare notes in the background. Playing and exporting are never slowed down.");
+    prepBox.setTooltip("How many CPU cores Kicktone uses to prepare notes in the background. Playing and exporting are never slowed down.");
     prepBox.onChange=[this]{const int id=prepBox.getSelectedId();if(id>0&&onPrepEffort)onPrepEffort(id-1);};
     addAndMakeVisible(prepBox);
     // v0.5.3 custom defaults.
-    defaultsButton.setTooltip("Choose the settings a new Tailtone starts with. Saved on this computer; projects you open keep their own settings.");
+    defaultsButton.setTooltip("Choose the settings a new Kicktone starts with. Saved on this computer; projects you open keep their own settings.");
     defaultsButton.onClick=[this]{showDefaults(true);};
     addAndMakeVisible(defaultsButton);
     defaultsPage.onBack=[this]{showDefaults(false);};
@@ -391,8 +391,8 @@ TailtoneDefaultsPage::TailtoneDefaultsPage() {
     for(auto [l,text]:labels){l->setText(text,juce::dontSendNotification);l->setFont(juce::Font(14.0f,juce::Font::bold));addAndMakeVisible(*l);}
     for(auto* c:{&engineBox,&punchModeBox,&reverbEngineBox,&uiSizeBox})addAndMakeVisible(*c);
     statusLabel.setFont(juce::Font(14.0f));addAndMakeVisible(statusLabel);
-    saveCurrentButton.setTooltip("Use the settings of this Tailtone as the start for every new one. Settings that belong to one sample (tail root, trims, offsets, output trims) are not stored.");
-    factoryButton.setTooltip("Forget your own defaults: new Tailtones start with the factory settings again.");
+    saveCurrentButton.setTooltip("Use the settings of this Kicktone as the start for every new one. Settings that belong to one sample (tail root, trims, offsets, output trims) are not stored.");
+    factoryButton.setTooltip("Forget your own defaults: new Kicktones start with the factory settings again.");
     saveCurrentButton.onClick=[this]{if(state&&processor){auto m=tt::defaults::capture(*state,*processor);
         for(auto it=m.begin();it!=m.end();)it=std::abs(it->second-tt::defaults::factory(*state,it->first))<1.e-6f?m.erase(it):std::next(it);
         tt::defaults::save(m);refresh();}};
@@ -445,7 +445,7 @@ void TailtoneDefaultsPage::paint(juce::Graphics& g) {
     g.drawText("DEFAULT SETTINGS",28,12,700,39,juce::Justification::centredLeft);
     g.setColour(thinLine);g.drawHorizontalLine(66,28,float(getWidth()-28));
     g.setColour(whiteAccent);g.setFont(juce::Font(16.0f));
-    g.drawFittedText("The settings a NEW Tailtone starts with, saved on this computer for every new instance. Projects and presets you open keep their own settings. "
+    g.drawFittedText("The settings a NEW Kicktone starts with, saved on this computer for every new instance. Projects and presets you open keep their own settings. "
         "Until you change something here, the factory defaults are used.",28,80,getWidth()-56,48,juce::Justification::topLeft,2);
     const auto card=[&](juce::Rectangle<int> r,const char* title,juce::Colour edge){
         g.setColour(panel);g.fillRoundedRectangle(r.toFloat(),9);g.setColour(edge);g.fillRoundedRectangle(r.withWidth(4).toFloat(),2);
@@ -462,7 +462,7 @@ void TailtoneAboutPage::setBuildInfo(const juce::StringArray& rows) {
     build=rows;resized();repaint();
 }
 juce::String TailtoneAboutPage::aiDetailText() {
-    return "Tailtone's sound engines, interface and automated tests were written with the help of "
+    return "Kicktone's sound engines, interface and automated tests were written with the help of "
            "different AI models, directed and tested by Jeipster. "
            "It is stated here openly so you know how this instrument was made.";
 }
@@ -471,7 +471,7 @@ const char* const TailtoneAboutPage::kContactEmail="Jeiaudio.project@gmail.com";
 juce::String TailtoneAboutPage::betaText() {
     return "This is a beta build. Every release passes its automated test suite, but it has not been "
            "checked in every DAW and on every system. Save your projects often and keep a copy of "
-           "the previous version: each new Tailtone version replaces the installed one. Please "
+           "the previous version: each new Kicktone version replaces the installed one. Please "
            "report crashes or anything that sounds wrong to Jei Audio:\n"
            + juce::String(kContactEmail);
 }
@@ -479,7 +479,7 @@ juce::String TailtoneAboutPage::creditsText() {
     return "JUCE framework - Raw Material Software Limited, used under the GNU GPL v3.\n"
            "r8brain-free-src - sample rate converter designed by Aleksey Vaneev of Voxengo (MIT licence).\n"
            "VST is a registered trademark of Steinberg Media Technologies GmbH.\n"
-           "Tailtone is free software under the GNU General Public License v3; the complete source "
+           "Kicktone is free software under the GNU General Public License v3; the complete source "
            "code is distributed with every release (LICENSE.txt, THIRD-PARTY.md).";
 }
 juce::StringArray TailtoneAboutPage::shortcuts() {
@@ -524,7 +524,7 @@ void TailtoneAboutPage::paint(juce::Graphics& g) {
     g.setColour(titleColour);
     if(logo.isValid())g.drawImageWithin(logo,28,10,45,43,juce::RectanglePlacement::centred,true);
     g.setFont(juce::Font(27.0f,juce::Font::bold));
-    g.drawText(product.replace("Tailtone","TAILTONE"),85,12,700,39,juce::Justification::centredLeft);
+    g.drawText(product.replace("Kicktone","KICKTONE"),85,12,700,39,juce::Justification::centredLeft);
     g.setColour(muted);g.setFont(juce::Font(15.0f,juce::Font::bold));
     g.drawText("ABOUT",getWidth()-28-120-130,18,120,32,juce::Justification::centredRight);
     g.setColour(thinLine);g.drawHorizontalLine(66,28,float(getWidth()-28));
@@ -584,7 +584,7 @@ void TailtoneAboutPage::paint(juce::Graphics& g) {
      g.drawText("Background rendering",left+24,y+80,166,28,juce::Justification::centredLeft);   // v0.5.10 Preparation CPU
      g.setColour(muted);g.setFont(juce::Font(13.0f));
      g.drawText("Saved on this computer for all your projects.",left+24+170+272,y+40,colW-48-170-272,28,juce::Justification::centredLeft);
-     g.drawText("Shared by every Tailtone on this computer.",left+24+170+272,y+80,colW-48-170-272,28,juce::Justification::centredLeft);}
+     g.drawText("Shared by every Kicktone on this computer.",left+24+170+272,y+80,colW-48-170-272,28,juce::Justification::centredLeft);}
     // RIGHT 1: mouse & keyboard.
     y=86;
     {const auto rows=shortcuts();const int h=58+rows.size()*32+8;const juce::Rectangle<int> r(right,y,colW,h);card(r,amber.brighter(.25f));
@@ -968,7 +968,7 @@ PunchTailEditor::PunchTailEditor(PunchTailProcessor& p)
     }();
     jeiLogo=logo;
     // v0.4.61: ABOUT button switches to the About page (and BACK returns).
-    aboutButton.setTooltip("About Tailtone: who made it and how, version details, credits and shortcuts.");
+    aboutButton.setTooltip("About Kicktone: who made it and how, version details, credits and shortcuts.");
     aboutButton.onClick=[this]{showAbout(!aboutPage.isVisible());};
     content.addAndMakeVisible(aboutButton);
     aboutPage.setLogo(jeiLogo);aboutPage.setProductName(proc.getName());
@@ -1044,7 +1044,7 @@ PunchTailEditor::PunchTailEditor(PunchTailProcessor& p)
         "Cut the end of the punch away. You can also drag its END marker or use Detect Punch End.",
         "Moves the tail earlier (negative) or later (positive) where it meets the punch.",
         "How long the end of the punch and the start of the tail overlap and blend. The finished waveform shows the result.",
-        "Punch volume.", "Tail volume.", "Overall volume of Tailtone. If the OUTPUT meter turns red, turn this down.",
+        "Punch volume.", "Tail volume.", "Overall volume of Kicktone. If the OUTPUT meter turns red, turn this down.",
         "Makes the tail longer or shorter (80-150 %) without changing its pitch. New notes use it once it is prepared in the background. Alt-click for 100 %.",
         "Skip the beginning of the reverb file. This does not change when the reverb starts playing.",
         "Start the reverb later, 0-300 ms after the punch ends. 0 ms = right at the end of the punch. Alt-click to reset.",
@@ -1362,7 +1362,7 @@ PunchTailEditor::PunchTailEditor(PunchTailProcessor& p)
         "On: it comes after the distortion, so it shapes the distorted sound. On the Tail EQ page it then shapes the tail and the reverb together. "
         "Switches smoothly while playing.");
     content.addAndMakeVisible(linearPhase);
-    linearPhase.setTooltip("For the Tail reverb EQ. Linear phase changes only the tone, not the timing, but adds a little delay; Tailtone tells your DAW so it lines everything up (FL Studio does this automatically). You can switch while playing: the sound fades out for 5 ms and back in. Older projects keep their saved setting.");
+    linearPhase.setTooltip("For the Tail reverb EQ. Linear phase changes only the tone, not the timing, but adds a little delay; Kicktone tells your DAW so it lines everything up (FL Studio does this automatically). You can switch while playing: the sound fades out for 5 ms and back in. Older projects keep their saved setting.");
     linearAttachment=std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(proc.params,"tailVerbLinearPhase",linearPhase);
     eqHeading.setText("PARAMETRIC EQ",juce::dontSendNotification);
     eqHeading.setFont(juce::Font(17.0f,juce::Font::bold));
@@ -1417,7 +1417,7 @@ PunchTailEditor::PunchTailEditor(PunchTailProcessor& p)
     for(juce::Component* c:std::initializer_list<juce::Component*>{&bassMonoTitle,&bassMonoNote,&bassMonoEnable,&bassMonoLinear,&bassMonoHzLabel,&bassMonoMixLabel,&bassMonoHz,&bassMonoMix})content.addAndMakeVisible(c);
     // v0.5.1 LINEAR PHASE for MONO BASS.
     bassMonoLinear.setTooltip("Linear phase: the low end becomes mono without changing the shape or timing of the punch and tail. "
-        "It adds about 35 ms of delay while MONO BASS is on; Tailtone tells your DAW, so FL Studio lines it up automatically. "
+        "It adds about 35 ms of delay while MONO BASS is on; Kicktone tells your DAW, so FL Studio lines it up automatically. "
         "You can switch it at any time. Off: no delay.");
     bassMonoLinearAttachment=std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(proc.params,"bassMonoLinear",bassMonoLinear);
     bassMonoTitle.setText("MONO BASS",juce::dontSendNotification);bassMonoTitle.setFont(juce::Font(12,juce::Font::bold));
@@ -1540,7 +1540,7 @@ PunchTailEditor::PunchTailEditor(PunchTailProcessor& p)
     syncEQControls();
     content.addAndMakeVisible(statusLabel);
     content.addAndMakeVisible(prepBar);   // v0.5.19
-    prepBar.setTooltip("How far Tailtone is with preparing the 37 pitched tail keys (D#2 to D#5) in the background. Keys you play are prepared first. "
+    prepBar.setTooltip("How far Kicktone is with preparing the 37 pitched tail keys (D#2 to D#5) in the background. Keys you play are prepared first. "
                        "The time left is an estimate. How many CPU cores are used is set by Background rendering on the About page.");
     prepBar.setSnapshot(proc.preparationProgress());
     content.addAndMakeVisible(pitchLabel);
@@ -2166,7 +2166,7 @@ void PunchTailEditor::addEQBand(double freq,double gain,int type) {
         }
     }
     juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
-        "Tailtone EQ","All five optional bands are already active. Disable or remove one to reuse it.");
+        "Kicktone EQ","All five optional bands are already active. Disable or remove one to reuse it.");
 }
 void PunchTailEditor::syncEQControls() {
     updatingEQControls=true;
@@ -2456,7 +2456,7 @@ juce::File PunchTailEditor::writeDragFile() {
     const auto audio=completedKick.renderedAudio();
     if(!audio)return {};
     // One folder per drag: hosts may still read the previous file while we write.
-    const auto folder=juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("Tailtone Drag")
+    const auto folder=juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("Kicktone Drag")
                           .getChildFile(juce::String(juce::Time::currentTimeMillis()));
     const auto file=folder.getChildFile(tt::exporter::defaultFileName(completedKick.renderedNote()));
     return tt::exporter::writeWav(*audio,file,completedKick.exportBits(),proc.getName()+" v"+PunchTailProcessor::versionString())?file:juce::File();

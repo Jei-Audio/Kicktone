@@ -212,7 +212,7 @@ inline std::string describe(const Snapshot& s) {
     if(s.phase==Phase::NoTail)return "Load a tail to prepare its "+std::to_string(s.total)+" keys";
     if(s.complete())return withActivity("All "+std::to_string(s.total)+" keys ready");
     const std::string left=s.secondsLeft>=0?formatSeconds(s.secondsLeft)+" left":std::string("estimating time left...");
-    if(s.waitingTurn)return withActivity(count+" | waiting for another Tailtone to finish");
+    if(s.waitingTurn)return withActivity(count+" | waiting for another Kicktone to finish");
     switch(s.phase) {
         case Phase::Settling: return withActivity(count+" | starting...");
         case Phase::Setup:    return withActivity(count+" | preparing the engine | "+left);

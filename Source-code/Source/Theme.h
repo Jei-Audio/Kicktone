@@ -40,8 +40,16 @@ inline std::atomic<int>& currentThemeIndex() { static std::atomic<int> index{-1}
 inline std::atomic<int>& themeEpoch() { static std::atomic<int> epoch{0}; return epoch; }
 inline juce::PropertiesFile::Options settingsOptions() {
     juce::PropertiesFile::Options o;
-    o.applicationName="Tailtone";o.folderName="JeiAudio";o.filenameSuffix=".settings";
+    o.applicationName="Kicktone";o.folderName="JeiAudio";o.filenameSuffix=".settings";
     o.osxLibrarySubFolder="Application Support";o.storageFormat=juce::PropertiesFile::storeAsXML;
+    // v0.5.29: the plugin was renamed from Tailtone. The first time, copy the old
+    // settings file (theme, custom defaults, export folder, background rendering).
+    static const bool migrated=[o]{
+        auto legacy=o;legacy.applicationName="Tailtone";
+        const auto now=o.getDefaultFile(),old=legacy.getDefaultFile();
+        return !now.existsAsFile()&&old.existsAsFile()&&old.copyFileTo(now);
+    }();
+    juce::ignoreUnused(migrated);
     return o;
 }
 // Optional override (tests): when set, the theme is neither read from nor saved to disk.

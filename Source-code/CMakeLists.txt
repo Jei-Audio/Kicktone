@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Tailtone VERSION 0.5.28 LANGUAGES C CXX)
+project(Tailtone VERSION 0.5.29 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # v0.5.24: link the MSVC C++ runtime into every binary (/MT, /MTd for Debug), so
@@ -18,7 +18,7 @@ set(PT_BUNDLED_R8BRAIN "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/r8brain")
 if(EXISTS "${PT_BUNDLED_R8BRAIN}/CDSPResampler.h")
     set(r8brain_SOURCE_DIR "${PT_BUNDLED_R8BRAIN}")
 else()
-    message(FATAL_ERROR "Bundled r8brain is missing. Fully extract the Tailtone ZIP again.")
+    message(FATAL_ERROR "Bundled r8brain is missing. Fully extract the Kicktone ZIP again.")
 endif()
 find_package(Threads REQUIRED)   # v0.4.65 parallel note rendering
 add_library(pt_r8brain INTERFACE)
@@ -165,7 +165,7 @@ if(NOT TARGET juce::juce_audio_utils)
            EXISTS "${PT_BUNDLED_JUCE}/modules/juce_audio_utils/juce_audio_utils.h")
             set(JUCE_PATH "${PT_BUNDLED_JUCE}")
         else()
-            message(WARNING "Bundled JUCE seems incomplete. Downloading the pinned official JUCE source instead. If this fails, extract the ZIP again to a shorter path, such as C:/Tailtone.")
+            message(WARNING "Bundled JUCE seems incomplete. Downloading the pinned official JUCE source instead. If this fails, extract the ZIP again to a shorter path, such as C:/Kicktone.")
         endif()
     endif()
     if(DEFINED JUCE_PATH AND NOT "${JUCE_PATH}" STREQUAL "")
@@ -191,14 +191,17 @@ endif()
 # v0.5 PERMANENT IDENTITY. From v0.5 on every release is the same plugin, so a
 # new version replaces the installed one and opens projects saved with any
 # earlier v0.5+ release (and v0.4.69, whose codes these are). NEVER change the
-# target name, PRODUCT_NAME, BUNDLE_ID, PLUGIN_MANUFACTURER_CODE or PLUGIN_CODE.
+# target name, BUNDLE_ID, PLUGIN_MANUFACTURER_CODE or PLUGIN_CODE (the VST3 class
+# ID is built from the two codes). v0.5.29: PRODUCT_NAME became "Kicktone" at the
+# user's request; the codes are unchanged, so Tailtone projects open in Kicktone.
+# The CMake target stays "Tailtone" (internal name only).
 # The version lives only in project(VERSION) above. IdentityTests guards this.
 juce_add_plugin(Tailtone
     COMPANY_NAME "Jei Audio" BUNDLE_ID "audio.jei.tailtone"
     PLUGIN_MANUFACTURER_CODE JeiA PLUGIN_CODE TaA2
     ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/Assets/tailtone-icon.png"
     COMPANY_COPYRIGHT "Jei Audio (Jeipster), GPLv3"
-    FORMATS ${TT_FORMATS} PRODUCT_NAME "Tailtone"
+    FORMATS ${TT_FORMATS} PRODUCT_NAME "Kicktone"
     IS_SYNTH TRUE NEEDS_MIDI_INPUT TRUE NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     COPY_PLUGIN_AFTER_BUILD FALSE VST3_CATEGORIES Instrument Sampler

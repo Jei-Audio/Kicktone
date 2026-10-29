@@ -15,7 +15,7 @@ inline bool writeWav(const pt::Sample& audio, const juce::File& file, int bitsPe
     if(!stream) return false;
     juce::StringPairArray metadata;
     if(description.isNotEmpty())
-        metadata=juce::WavAudioFormat::createBWAVMetadata(description,"Jei Audio Tailtone","",juce::Time::getCurrentTime(),0,"");
+        metadata=juce::WavAudioFormat::createBWAVMetadata(description,"Jei Audio Kicktone","",juce::Time::getCurrentTime(),0,"");
     juce::WavAudioFormat wav;
     std::unique_ptr<juce::AudioFormatWriter> writer(wav.createWriterFor(stream.get(),audio.rate,2,bitsPerSample,metadata,0));
     if(!writer) return false;
@@ -31,8 +31,8 @@ inline bool writeWav(const pt::Sample& audio, const juce::File& file, int bitsPe
     writer.reset();
     return temp.overwriteTargetFileWithTemporary();
 }
-// A friendly file name such as "Tailtone Kick C3.wav" (FL Studio note names).
+// A friendly file name such as "Kicktone Kick C3.wav" (FL Studio note names).
 inline juce::String defaultFileName(int rootNote) {
-    return "Tailtone Kick "+juce::MidiMessage::getMidiNoteName(rootNote,true,true,5)+".wav";
+    return "Kicktone Kick "+juce::MidiMessage::getMidiNoteName(rootNote,true,true,5)+".wav";
 }
 } // namespace tt::exporter

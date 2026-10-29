@@ -1,10 +1,10 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-title Tailtone - Windows installer build
+title Kicktone - Windows installer build
 
 rem ==========================================================================
-rem  Tailtone Windows installer (v0.5.24)
+rem  Kicktone Windows installer (v0.5.24; renamed from Tailtone in v0.5.29)
 rem
 rem    BUILD-INSTALLER-WINDOWS.cmd            clean build + all tests, then the
 rem                                           installer (use this for a release)
@@ -13,8 +13,8 @@ rem    BUILD-INSTALLER-WINDOWS.cmd skipbuild  package the last build as it is
 rem
 rem  Needs Inno Setup 6.3 or later (https://jrsoftware.org/isinfo.php).
 rem  Output in <package>\Release:
-rem    Tailtone-<version>-Windows-Setup.exe   installer (VST3 + standalone)
-rem    Tailtone-<version>-Windows-VST3.zip    the plugin for manual install
+rem    Kicktone-<version>-Windows-Setup.exe   installer (VST3 + standalone)
+rem    Kicktone-<version>-Windows-VST3.zip    the plugin for manual install
 rem ==========================================================================
 rem TT_NO_PAUSE (set by a caller) skips the final pause, as in Build-Windows.cmd.
 set "OWN_PAUSE=1"
@@ -40,7 +40,7 @@ if not defined VERSION (
     goto failed
 )
 echo ==========================================================
-echo   Tailtone %VERSION% - Windows installer  (%MODE%)
+echo   Kicktone %VERSION% - Windows installer  (%MODE%)
 echo ==========================================================
 
 rem Find Inno Setup before spending time on the build.
@@ -59,7 +59,7 @@ echo Inno Setup: "%ISCC%"
 
 if /I not "%MODE%"=="skipbuild" (
     echo.
-    echo Building Tailtone and running every test ^(%MODE%^)...
+    echo Building Kicktone and running every test ^(%MODE%^)...
     set "TT_NO_PAUSE=1"
     call "%SRC%\Build-Windows.cmd" %MODE%
     if errorlevel 1 (
@@ -73,9 +73,9 @@ if not defined LOCALAPPDATA (
     goto failed
 )
 set "ART=%LOCALAPPDATA%\JeiAudio\Tailtone\Tailtone_artefacts\Release"
-set "VST3=%ART%\VST3\Tailtone.vst3"
-set "EXE=%ART%\Standalone\Tailtone.exe"
-if not exist "%VST3%\Contents\x86_64-win\Tailtone.vst3" (
+set "VST3=%ART%\VST3\Kicktone.vst3"
+set "EXE=%ART%\Standalone\Kicktone.exe"
+if not exist "%VST3%\Contents\x86_64-win\Kicktone.vst3" (
     echo ERROR: no built plugin at "%VST3%". Run without skipbuild.
     goto failed
 )
@@ -88,31 +88,31 @@ set "OUT=%PKG%\Release"
 if not exist "%OUT%" mkdir "%OUT%"
 echo.
 echo Making the installer...
-"%ISCC%" /Qp "/DAppVersion=%VERSION%" "/DVst3Dir=%VST3%" "/DStandaloneExe=%EXE%" "/DPackageDir=%PKG%" "/O%OUT%" "%~dp0Tailtone.iss"
+"%ISCC%" /Qp "/DAppVersion=%VERSION%" "/DVst3Dir=%VST3%" "/DStandaloneExe=%EXE%" "/DPackageDir=%PKG%" "/O%OUT%" "%~dp0Kicktone.iss"
 if errorlevel 1 (
     echo ERROR: Inno Setup failed ^(see above^).
     goto failed
 )
 
 echo Making the VST3 zip...
-set "ZIPDIR=%TEMP%\Tailtone-%VERSION%-zip"
+set "ZIPDIR=%TEMP%\Kicktone-%VERSION%-zip"
 if exist "%ZIPDIR%" rmdir /s /q "%ZIPDIR%"
 mkdir "%ZIPDIR%"
-robocopy "%VST3%" "%ZIPDIR%\Tailtone.vst3" /E /NFL /NDL /NJH /NJS /NP >nul
+robocopy "%VST3%" "%ZIPDIR%\Kicktone.vst3" /E /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto zip_failed
-copy /y "%~dp0Tailtone-ReadMe.txt" "%ZIPDIR%\" >nul
+copy /y "%~dp0Kicktone-ReadMe.txt" "%ZIPDIR%\" >nul
 copy /y "%SRC%\LICENSE.txt" "%ZIPDIR%\" >nul
 copy /y "%SRC%\THIRD-PARTY.md" "%ZIPDIR%\" >nul
-if exist "%OUT%\Tailtone-%VERSION%-Windows-VST3.zip" del /q "%OUT%\Tailtone-%VERSION%-Windows-VST3.zip"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '%ZIPDIR%\*' -DestinationPath '%OUT%\Tailtone-%VERSION%-Windows-VST3.zip'"
+if exist "%OUT%\Kicktone-%VERSION%-Windows-VST3.zip" del /q "%OUT%\Kicktone-%VERSION%-Windows-VST3.zip"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '%ZIPDIR%\*' -DestinationPath '%OUT%\Kicktone-%VERSION%-Windows-VST3.zip'"
 if errorlevel 1 goto zip_failed
 rmdir /s /q "%ZIPDIR%"
 
 echo.
 echo ==========================================================
 echo INSTALLER READY in "%OUT%":
-echo   Tailtone-%VERSION%-Windows-Setup.exe
-echo   Tailtone-%VERSION%-Windows-VST3.zip
+echo   Kicktone-%VERSION%-Windows-Setup.exe
+echo   Kicktone-%VERSION%-Windows-VST3.zip
 echo Not code-signed: Windows SmartScreen will warn on other PCs.
 echo ==========================================================
 echo.

@@ -83,7 +83,7 @@ static void tracker() {
     t.setConfig(1,4.0);ck(t.snapshot(30).secondsLeft>0,"configurations are kept side by side");
     // Waiting for another instance's turn.
     t.setWaiting(true);s=t.snapshot(31);
-    ck(s.waitingTurn && describe(s)=="1/37 keys | waiting for another Tailtone to finish","waiting text");
+    ck(s.waitingTurn && describe(s)=="1/37 keys | waiting for another Kicktone to finish","waiting text");
     t.setPhase(Phase::Rendering);ck(!t.snapshot(31).waitingTurn,"a new phase clears the waiting notice");
     // Complete and the separate punch / crunch work.
     t.setReady(37,37);t.setPhase(Phase::Ready);s=t.snapshot(40);
@@ -206,7 +206,7 @@ static void waiting(const juce::File& tail) {
     pt::parallel::instanceSlotsOverride().store(1);pt::parallel::foregroundSlotsOverride().store(1);
     pt::parallel::PreparationSlot blocker;ck(blocker.claim(pt::parallel::Priority::Foreground),"blocker turn");
     auto p=std::make_unique<PunchTailProcessor>();p->loadFile(1,tail);
-    bool said=false;for(int i=0;i<3000 && !said;++i){const auto s=p->preparationProgress();said=s.waitingTurn && describe(s).find("waiting for another Tailtone")!=std::string::npos;juce::Thread::sleep(1);}
+    bool said=false;for(int i=0;i<3000 && !said;++i){const auto s=p->preparationProgress();said=s.waitingTurn && describe(s).find("waiting for another Kicktone")!=std::string::npos;juce::Thread::sleep(1);}
     blocker.release();
     ck(said,"waiting instance: "+describe(p->preparationProgress()));
     bool cleared=false;for(int i=0;i<60000 && !cleared;++i){cleared=!p->preparationProgress().waitingTurn && dry(*p) && dry(*p)->usable();juce::Thread::sleep(1);}

@@ -107,7 +107,7 @@ inline std::vector<std::array<float,2>> previewBusLowBands(const PreviewBuses& b
 
 class ProcessedPreview final : private juce::Thread {
 public:
-    ProcessedPreview():juce::Thread("Tailtone waveform") { startThread(); }
+    ProcessedPreview():juce::Thread("Kicktone waveform") { startThread(); }
     ~ProcessedPreview() override { signalThreadShouldExit(); notify(); stopThread(-1); }
     uint64_t submit(PreviewRequest request) {
         const juce::ScopedLock lock(mutex);

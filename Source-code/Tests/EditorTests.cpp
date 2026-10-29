@@ -521,7 +521,7 @@ struct PunchTailEditorTest {
             check(c->getRight()<=e.layerMute[0].getX()&&c->getY()<60,"Header options overlap the mute switches");
         {const juce::Component* row[]={&e.punchLayer,&e.glide,&e.glideTime};
          for(int i=1;i<3;++i)check(row[i]->getX()>=row[i-1]->getRight(),"Header glide options overlap each other");
-         const float title=85.f+juce::Font(27.0f,juce::Font::bold).getStringWidthFloat("TAILTONE v"+PunchTailProcessor::versionString());
+         const float title=85.f+juce::Font(27.0f,juce::Font::bold).getStringWidthFloat("KICKTONE v"+PunchTailProcessor::versionString());
          check(float(e.punchLayer.getX())>title+12.f,"Header options overlap the title");}
         // Highest Fidelity v4: the default and, with Adaptive Stretch v4, the only engine.
         e.qualityMode.setSelectedId(5,juce::sendNotificationSync);e.timerCallback();
@@ -703,7 +703,7 @@ struct PunchTailEditorTest {
         // v0.4.17: versioned identity, graphical EQ, editable extra bands,
         // type menu, slope and UI resizing are all host state-backed.
         check(e.jeiLogo.isValid() && e.jeiLogo.hasAlphaChannel() && e.jeiLogo.getPixelAt(0,0).getAlpha()==0,"Transparent JEI header logo missing");
-        check(p.getName()=="Tailtone","Permanent DAW-visible name \"Tailtone\" missing");
+        check(p.getName()=="Kicktone","Permanent DAW-visible name \"Kicktone\" missing");
         check(value("punchRegionOn")==0 && value("punchRegionSplit")==20 && value("punchRegionTransition")==2,"Punch region defaults changed");
         const auto regionBox=e.punchRegionWave.plot();
         e.punchRegionWave.mouseDown(event(e.punchRegionWave,{regionBox.getX()+regionBox.getWidth()*.2f,regionBox.getCentreY()}));
@@ -1372,7 +1372,7 @@ struct PunchTailEditorTest {
          const auto audio=e.completedKick.renderedAudio();
          check(audio&&audio->left.size()>1000&&e.completedKick.exportButton.isEnabled(),"No rendered kick to export");
          const auto file=e.writeDragFile();
-         check(file.existsAsFile()&&file.getFileName().startsWith("Tailtone Kick ")&&file.hasFileExtension("wav"),"Drag WAV was not written");
+         check(file.existsAsFile()&&file.getFileName().startsWith("Kicktone Kick ")&&file.hasFileExtension("wav"),"Drag WAV was not written");
          juce::AudioFormatManager formats;formats.registerBasicFormats();
          {std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
           check(reader&&reader->numChannels==2&&reader->bitsPerSample==24&&reader->sampleRate==audio->rate&&reader->lengthInSamples==juce::int64(audio->left.size()),"Exported WAV format/length wrong");
@@ -1390,7 +1390,7 @@ struct PunchTailEditorTest {
          e.completedKick.bitDepthBox.setSelectedId(2,juce::sendNotificationSync);
          file.getParentDirectory().deleteRecursively();
          check(!tt::exporter::writeWav(pt::Sample{},juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("tt-empty.wav"),24),"Empty audio must not export");
-         check(tt::exporter::defaultFileName(36)=="Tailtone Kick C3.wav","Export file name must use FL Studio note names");
+         check(tt::exporter::defaultFileName(36)=="Kicktone Kick C3.wav","Export file name must use FL Studio note names");
          e.completedKick.updating=true;e.completedKick.refreshExportState();
          check(!e.completedKick.exportButton.isEnabled()&&!e.completedKick.renderedAudio(),"Export must wait while the waveform is updating");
          e.completedKick.updating=false;e.completedKick.refreshExportState();check(e.completedKick.exportButton.isEnabled(),"Export did not re-enable after rendering");}
@@ -1398,7 +1398,7 @@ struct PunchTailEditorTest {
         // v0.5.18: shown as "Background rendering" with Eco / Balanced / Fast (same stored values).
         {check(e.aboutPage.prepBox.getNumItems()==3&&e.aboutPage.prepBox.getSelectedId()==1&&tt::ui::prepEffort()==0&&pt::parallel::effort().load()==0&&pt::parallel::defaultThreads()==1,"Background rendering must default to Eco (1 core)");
          check(e.aboutPage.prepBox.getItemText(0)=="Eco (1 core)"&&e.aboutPage.prepBox.getItemText(1)=="Balanced (half the cores)"&&e.aboutPage.prepBox.getItemText(2)=="Fast (all cores but one)","Background rendering choices renamed wrongly");
-         check(e.aboutPage.prepBox.getTooltip()=="How many CPU cores Tailtone uses to prepare notes in the background. Playing and exporting are never slowed down.","Background rendering tooltip wrong");
+         check(e.aboutPage.prepBox.getTooltip()=="How many CPU cores Kicktone uses to prepare notes in the background. Playing and exporting are never slowed down.","Background rendering tooltip wrong");
          check(juce::Font(14.0f,juce::Font::bold).getStringWidth("Background rendering")<=166&&e.aboutPage.prepBox.getX()>=28+24+166,"Background rendering label does not fit before its box");
          check(e.aboutPage.prepBox.getY()>e.aboutPage.themeBox.getBottom()&&e.aboutPage.prepBox.getX()==e.aboutPage.themeBox.getX(),"Background rendering box misplaced");
          e.aboutPage.prepBox.setSelectedId(2,juce::sendNotificationSync);
@@ -1423,7 +1423,7 @@ struct PunchTailEditorTest {
          s.phase=pt::progress::Phase::Paused;s.startsIn=4.3;s.secondsLeft=84;
          bar.setSnapshot(s);check(bar.getText()=="14/37 keys | the other keys start in 5 s | about 1 min 25 s left"&&bar.fillColour()==tt::ui::pal().muted,("Paused text/colour: "+bar.getText().toStdString()).c_str());
          check(juce::Font(13.0f).getStringWidth(bar.getText())<=e.prepBarWidth-16,"Longest preparation text does not fit the bar");
-         s.waitingTurn=true;bar.setSnapshot(s);check(bar.getText()=="14/37 keys | waiting for another Tailtone to finish","Waiting text");
+         s.waitingTurn=true;bar.setSnapshot(s);check(bar.getText()=="14/37 keys | waiting for another Kicktone to finish","Waiting text");
          s={};s.phase=pt::progress::Phase::Ready;s.ready=37;s.secondsLeft=0;
          bar.setSnapshot(s);check(bar.getText()=="All 37 keys ready"&&bar.fillColour()==tt::ui::pal().ok,"Complete text/colour");
          s={};bar.setSnapshot(s);check(bar.getText()=="Load a tail to prepare its 37 keys","No-tail text");
