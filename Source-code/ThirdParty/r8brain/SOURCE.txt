@@ -1,0 +1,3 @@
+Official https://github.com/avaneev/r8brain-free-src master archive retrieved 2026-10-11.
+Archive SHA256: 49d7b276e7e59bbc975fa92bbfa9eb4d9c88df84667db88b90405a928e45ab96
+Core headers, FFT and license bundled unchanged; DLL and benchmark folders omitted.

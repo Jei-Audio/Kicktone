@@ -1,0 +1,75 @@
+#pragma once
+// Plugin configuration for scripts/CrossBuild.py (Windows VST3 cross-build with
+// LLVM-MinGW). Keep in sync with juce_add_plugin() in CMakeLists.txt.
+#define JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED 1
+#define JUCE_STANDALONE_APPLICATION 0
+#define JUCE_DISPLAY_SPLASH_SCREEN 0
+#define JUCE_REPORT_APP_USAGE 0
+#define JUCE_WEB_BROWSER 0
+#define JUCE_USE_CURL 0
+#define JUCE_USE_MP3AUDIOFORMAT 1
+#define JUCE_USE_WINDOWS_MEDIA_FORMAT 0
+#define JUCE_VST3_CAN_REPLACE_VST2 0
+#define JUCE_TARGET_HAS_BINARY_DATA 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_basics 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_devices 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_formats 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_plugin_client 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_processors 1
+#define JUCE_MODULE_AVAILABLE_juce_audio_utils 1
+#define JUCE_MODULE_AVAILABLE_juce_core 1
+#define JUCE_MODULE_AVAILABLE_juce_data_structures 1
+#define JUCE_MODULE_AVAILABLE_juce_dsp 1
+#define JUCE_MODULE_AVAILABLE_juce_events 1
+#define JUCE_MODULE_AVAILABLE_juce_graphics 1
+#define JUCE_MODULE_AVAILABLE_juce_gui_basics 1
+#define JUCE_MODULE_AVAILABLE_juce_gui_extra 1
+#define JucePlugin_Build_VST3 1
+#define JucePlugin_Build_VST 0
+#define JucePlugin_Build_AU 0
+#define JucePlugin_Build_AUv3 0
+#define JucePlugin_Build_AAX 0
+#define JucePlugin_Build_LV2 0
+#define JucePlugin_Build_Standalone 0
+#define JucePlugin_Build_Unity 0
+#define JucePlugin_Enable_ARA 0
+#define JucePlugin_IsSynth 1
+#define JucePlugin_IsMidiEffect 0
+#define JucePlugin_WantsMidiInput 1
+#define JucePlugin_ProducesMidiOutput 0
+#define JucePlugin_EditorRequiresKeyboardFocus 0
+#define JucePlugin_Manufacturer "Jei Audio"
+#define JucePlugin_ManufacturerWebsite ""
+#define JucePlugin_ManufacturerEmail ""
+#define JucePlugin_ManufacturerCode 0x4a656941
+#define JucePlugin_PluginCode 0x54614132
+#define JucePlugin_Name "Tailtone"
+#define JucePlugin_Desc "Tailtone"
+#define JucePlugin_Version 0.5.28
+#define JucePlugin_VersionString "0.5.28"
+#define JucePlugin_VersionCode 0x51c
+#define JucePlugin_CFBundleIdentifier audio.jei.tailtone
+#define JucePlugin_VSTUniqueID JucePlugin_PluginCode
+#define JucePlugin_VSTCategory kPlugCategSynth
+#define JucePlugin_Vst3Category "Instrument|Sampler"
+#define JucePlugin_VSTNumMidiInputs 16
+#define JucePlugin_VSTNumMidiOutputs 16
+#define JucePlugin_AAXIdentifier audio.jei.tailtone
+#define JucePlugin_AAXManufacturerCode JucePlugin_ManufacturerCode
+#define JucePlugin_AAXProductId JucePlugin_PluginCode
+#define JucePlugin_AAXCategory 2048
+#define JucePlugin_AAXDisableBypass 0
+#define JucePlugin_AAXDisableMultiMono 0
+#define JucePlugin_AUMainType 'aumu'
+#define JucePlugin_AUSubType JucePlugin_PluginCode
+#define JucePlugin_AUExportPrefix TailtoneAU
+#define JucePlugin_AUExportPrefixQuoted "TailtoneAU"
+#define JucePlugin_AUManufacturerCode JucePlugin_ManufacturerCode
+#define JucePlugin_ARAFactoryID "audio.jei.tailtone.arafactory"
+#define JucePlugin_ARADocumentArchiveID "audio.jei.tailtone.aradocumentarchive.1"
+#define JucePlugin_ARACompatibleArchiveIDs ""
+#define JucePlugin_ARAContentTypes 0
+#define JucePlugin_ARATransformationFlags 0
+#ifndef NDEBUG
+ #define NDEBUG 1
+#endif

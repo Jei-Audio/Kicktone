@@ -1,0 +1,32 @@
+# Private test fixtures: NOT covered by the GPL (see Source-code/THIRD-PARTY.md).
+# The tests that need them are reported as skipped when they are missing.
+/Samples/
+
+# Release binaries: attach them to a GitHub release instead of committing them.
+/Release/
+
+# Paths start with / so they only match at the top (JUCE has extras/Build).
+# Build folders (the Windows script builds in %LOCALAPPDATA%\JeiAudio\Tailtone).
+/build/
+/build-*/
+/out/
+/History/
+/.vs/
+/.vscode/
+/.idea/
+
+# Internal development notes
+/AGENTS.md
+/RELEASE-CHECKLIST.md
+/README-v*.txt
+/BUILD-STATUS.txt
+/Source-code/BUILD-STATUS.txt
+/TEST-RESULTS.txt
+/SOURCE-SHA256.txt
+
+# Local tool state
+/.claude/
+*.user
+Thumbs.db
+desktop.ini
+.DS_Store

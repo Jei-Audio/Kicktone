@@ -1,0 +1,5 @@
+Bundled JUCE: carried forward unchanged from PunchTail v0.3.0.
+r8brain-free-src: unmodified source from https://github.com/avaneev/r8brain-free-src
+  (master branch downloaded on the first CMake configure; MIT license).
+Rubber Band dependency removed from v0.4.0; prior R3 version remains separately available.
+No r8brain source or test shim is bundled in this archive.

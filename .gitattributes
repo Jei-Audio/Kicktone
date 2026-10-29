@@ -1,0 +1,7 @@
+# Store every file exactly as it is: the Windows .cmd scripts must keep CRLF,
+# and nothing in the build depends on git converting line endings.
+* -text
+*.wav binary
+*.png binary
+*.exe binary
+*.zip binary
