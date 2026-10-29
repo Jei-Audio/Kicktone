@@ -218,6 +218,7 @@ public:
     // remixing the last render's buses (remixPreview) until a render for them arrives.
     void showOutputGains(std::array<float,2> gains);
     bool outputDragActive() const { return outputDragging; }
+    std::shared_ptr<const PreviewBuses> renderedBuses() const { return buses; }   // v0.5.32: base of Punch-only renders
     void resized() override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
@@ -617,6 +618,10 @@ private:
     std::vector<float> lastEffectParams;
     double lastPreviewRate=0;
     std::array<float,2> lastNormalizeGains{};   // v0.5.28: see timerCallback
+    // v0.5.32: Punch-chain parameters are tracked apart; while the shown render
+    // comes from the latest full render, changing only them redoes just the Punch.
+    std::vector<float> lastPunchParams;
+    uint64_t fullPreviewGeneration=0, shownFullGeneration=0;
     void applyLayout();
     void resizeLayout();
     void saveLayout();

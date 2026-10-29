@@ -45,6 +45,22 @@ struct PreviewRequest {
     bool limiter=false; // v0.4.60 output limiter, mirrored on the final waveform
     bool bassMono=false; double bassMonoHz=tt::BassMono::kDefaultHz; float bassMonoMix=1.f; bool bassMonoLinear=false;   // v0.5 / v0.5.1
     uint64_t generation=0;
+    // v0.5.32: set when only the Punch chain changed since the render that made
+    // these buses (Punch Attack/Decay, its trims, Punch EQ, transient, Punch
+    // distortion settings - not its ON switch): the worker then redoes only the
+    // Punch bus and reuses the rest.
+    // The caller guarantees every other input is unchanged. baseGeneration is the
+    // editor's bookkeeping (the full render the buses come from).
+    std::shared_ptr<const struct PreviewBuses> punchBase;
+    uint64_t baseGeneration=0;
+};
+// v0.5.32: the voice's Punch before Punch Attack/Decay and its time, per frame,
+// kept by a full render so a Punch-only render can start from it.
+struct PreviewPunchSource {
+    std::vector<std::array<float,2>> punch;
+    std::vector<double> time;
+    double punchEnd=0;
+    pt::KickOverview timing;   // timing fields only, no envelope
 };
 // v0.5.28: the two output buses of a finished render, so the Final Kick waveform
 // can follow a Punch / Tail volume drag at once (remixPreview on the message
@@ -57,6 +73,7 @@ struct PreviewBuses {
     std::vector<std::array<float,5>> frames;
     std::vector<std::array<float,2>> monoLow;
     bool limiter=false, bassMono=false; double bassMonoHz=tt::BassMono::kDefaultHz; float bassMonoMix=1.f;
+    std::shared_ptr<const PreviewPunchSource> punchSource;   // v0.5.32
 };
 // v0.4.62: `audio` is the complete rendered stereo kick (what the Final Kick
 // Waveform shows, after the limiter), used by Export WAV and drag-and-drop.
@@ -105,6 +122,69 @@ inline std::vector<std::array<float,2>> previewBusLowBands(const PreviewBuses& b
     return out;
 }
 
+// The output stage of a render (v0.5.32: shared by the full and the Punch-only
+// render): attack / decay trims, normalize gains, envelope, mono bass, limiter,
+// peaks, buses, exported audio and waveform columns, frame by frame.
+struct PreviewOutput {
+    const PreviewRequest& r;pt::KickOverview& k;std::array<float,4>& peaks;pt::Sample* audio;PreviewBuses* buses;
+    size_t frames,bins;
+    tt::OutputLimiter limiter;tt::BassMono bassMono;
+    bool linearMono;std::vector<float> preL,preR;
+    PreviewOutput(const PreviewRequest& request,double rate,pt::KickOverview& kick,std::array<float,4>& p,pt::Sample* a,PreviewBuses* b,size_t frameCount)
+        :r(request),k(kick),peaks(p),audio(a),buses(b),frames(frameCount),bins((std::min)(size_t(7200),frameCount)) {
+        limiter.prepare(rate);
+        bassMono.prepare(rate);bassMono.settle(r.bassMono,r.bassMonoMix);   // v0.5
+        if(audio){audio->rate=rate;audio->left.assign(frames,0.f);audio->right.assign(frames,0.f);}
+        if(buses){buses->rate=rate;buses->bins=bins;buses->frames.assign(frames,{});buses->limiter=r.limiter;
+                  buses->bassMono=r.bassMono;buses->bassMonoHz=r.bassMonoHz;buses->bassMonoMix=r.bassMonoMix;}
+        k.envelope.bins.resize(bins);
+        for(auto& b:k.envelope.bins){b.minimum=std::numeric_limits<float>::max();b.maximum=std::numeric_limits<float>::lowest();}
+        // v0.5.1: linear-phase MONO BASS is applied to the whole render afterwards
+        // (zero-phase, aligned), then the limiter, so the waveform/export match playback.
+        linearMono=r.bassMono&&r.bassMonoLinear&&r.bassMonoMix>0.f;
+        if(linearMono){preL.assign(frames,0.f);preR.assign(frames,0.f);}
+    }
+    // punchBus: Punch after its effects (and its EQ when that sits after the
+    // distortion); w: decay share; tail: Tail + Reverb bus incl. generated wet.
+    void frame(size_t f,std::array<float,2> punchBus,float w,std::array<float,2> tail,float envelopeGain) {
+        auto& bin=k.envelope.bins[(std::min)(bins-1,f*bins/frames)];
+        std::array<float,2> out{};
+        const float splitGain=tt::PunchSplitTrim::gain(r.splitNormalizeGains[0],r.splitNormalizeGains[1],w);
+        auto* busFrame=buses?&buses->frames[f]:nullptr;
+        if(busFrame)(*busFrame)[4]=envelopeGain;
+        for(int ch=0;ch<2;++ch){const float raw=punchBus[size_t(ch)],punch=raw*splitGain,t=tail[size_t(ch)];
+            peaks[0]=(std::max)(peaks[0],std::abs(punch));peaks[1]=(std::max)(peaks[1],std::abs(t));
+            peaks[2]=(std::max)(peaks[2],std::abs(raw*(1.f-w)));peaks[3]=(std::max)(peaks[3],std::abs(raw*w));
+            if(busFrame){(*busFrame)[size_t(ch)]=punch;(*busFrame)[size_t(2+ch)]=t;}
+            out[size_t(ch)]=(punch*r.normalizeGains[0]+t*r.normalizeGains[1])*envelopeGain;}
+        if(linearMono){preL[f]=out[0];preR[f]=out[1];return;}
+        bassMono.process(out[0],out[1],r.bassMono,r.bassMonoHz,r.bassMonoMix);
+        limiter.process(out[0],out[1],r.limiter);
+        if(audio){audio->left[f]=out[0];audio->right[f]=out[1];}
+        for(float v:out){const float x=std::clamp(v,-1.0f,1.0f);bin.minimum=(std::min)(bin.minimum,x);bin.maximum=(std::max)(bin.maximum,x);}
+    }
+    template<class Stop> bool finish(double rate,Stop&& stop) {
+        if(linearMono) {
+            if(stop())return false;
+            const auto low=tt::bassmono::sideLowBand(preL,preR,r.bassMonoHz,rate);
+            const float mixAmount=std::clamp(r.bassMonoMix,0.f,1.f);
+            for(size_t f=0;f<frames;++f) {
+                std::array<float,2> out{float(preL[f]-mixAmount*low[f]),float(preR[f]+mixAmount*low[f])};
+                limiter.process(out[0],out[1],r.limiter);
+                if(audio){audio->left[f]=out[0];audio->right[f]=out[1];}
+                auto& bin=k.envelope.bins[(std::min)(bins-1,f*bins/frames)];
+                for(float v:out){const float x=std::clamp(v,-1.0f,1.0f);bin.minimum=(std::min)(bin.minimum,x);bin.maximum=(std::max)(bin.maximum,x);}
+            }
+            if(buses){
+                if(stop())return false;
+                buses->monoLow=previewBusLowBands(*buses,r.bassMonoHz);
+            }
+        }
+        for(auto& b:k.envelope.bins){if(b.minimum>b.maximum)b={};k.envelope.peak=(std::max)({k.envelope.peak,std::abs(b.minimum),std::abs(b.maximum)});}
+        return true;
+    }
+};
+
 class ProcessedPreview final : private juce::Thread {
 public:
     ProcessedPreview():juce::Thread("Kicktone waveform") { startThread(); }
@@ -129,7 +209,10 @@ private:
             if(!job) {wait(100);continue;}
             PreviewResult result; result.request=*job;
             auto audio=std::make_shared<pt::Sample>();auto buses=std::make_shared<PreviewBuses>();
-            if(render(*job,result.kick,result.processedPeaks,audio.get(),buses.get())) {
+            result.request.punchBase.reset();   // keep no chain of older renders alive
+            const bool punchOnly=job->punchBase&&job->punchBase->punchSource;
+            if(punchOnly?renderPunch(*job,*job->punchBase,result.kick,result.processedPeaks,audio.get(),buses.get())
+                        :render(*job,result.kick,result.processedPeaks,audio.get(),buses.get())) {
                 if(!audio->left.empty())result.audio=std::move(audio);
                 if(!buses->frames.empty())result.buses=std::move(buses);
                 const juce::ScopedLock lock(mutex);
@@ -154,8 +237,6 @@ private:
         k.totalMs=tt::completeOutputDuration(voice,punch!=nullptr,tail!=nullptr,r.generated,r.punchGenerated,r.layerMuted)*1000;
         if(k.totalMs<=0)return true;
         tt::MasterEnvelope envelope;envelope.start(rate,k.totalMs*.001,r.envelope);
-        tt::OutputLimiter limiter;limiter.prepare(rate);
-        tt::BassMono bassMono;bassMono.prepare(rate);bassMono.settle(r.bassMono,r.bassMonoMix);   // v0.5
         constexpr int block=256;
         pt::TailReverb generated;generated.prepare(rate);auto tailGeneratedSettings=r.generated;tailGeneratedSettings.punchPreDelayMs=r.generated.tailOffsetMs;generated.setSettings(tailGeneratedSettings);
         pt::TailReverb punchGenerated;punchGenerated.prepare(rate);punchGenerated.setSettings(r.punchGenerated);
@@ -211,16 +292,10 @@ private:
                 if(i>=latency)linearWet[i-latency]=filtered;
             }
         }
-        const size_t bins=(std::min)(size_t(7200),frames);
-        if(audio){audio->rate=rate;audio->left.assign(frames,0.f);audio->right.assign(frames,0.f);}
-        if(buses){buses->rate=rate;buses->bins=bins;buses->frames.assign(frames,{});buses->limiter=r.limiter;
-                  buses->bassMono=r.bassMono;buses->bassMonoHz=r.bassMonoHz;buses->bassMonoMix=r.bassMonoMix;}
-        k.envelope.bins.resize(bins);
-        for(auto& b:k.envelope.bins){b.minimum=std::numeric_limits<float>::max();b.maximum=std::numeric_limits<float>::lowest();}
-        // v0.5.1: linear-phase MONO BASS is applied to the whole render afterwards
-        // (zero-phase, aligned), then the limiter, so the waveform/export match playback.
-        const bool linearMono=r.bassMono&&r.bassMonoLinear&&r.bassMonoMix>0.f;
-        std::vector<float> preL,preR;if(linearMono){preL.assign(frames,0.f);preR.assign(frames,0.f);}
+        PreviewOutput output(r,rate,k,peaks,audio,buses,frames);
+        std::shared_ptr<PreviewPunchSource> source;
+        if(buses){source=std::make_shared<PreviewPunchSource>();source->punch.assign(frames,{});source->time.assign(frames,0.0);
+                  source->punchEnd=voice.punchEnd;source->timing=k;source->timing.envelope={};}
         for(size_t start=0;start<frames;start+=block) {
             if(threadShouldExit()||r.generation!=latest)return false;
             const int count=int((std::min)(size_t(block),frames-start));
@@ -244,6 +319,8 @@ private:
                 parts.reverb[0]*=duckGain;parts.reverb[1]*=duckGain;
                 wetBuffer[size_t(i)]={(tailWetProcessed[0]*mix*wetLevel+punchWet[0]*punchMix*punchWetLevel)*duckGain,(tailWetProcessed[1]*mix*wetLevel+punchWet[1]*punchMix*punchWetLevel)*duckGain};
                 if(!r.generated.tailRootPitch&&!r.generated.keepDry){parts.tail[0]*=1-mix;parts.tail[1]*=1-mix;}
+                if(source){source->punch[start+size_t(i)]={parts.punch[0],parts.punch[1]};source->time[start+size_t(i)]=voiceTime;}
+                // Punch chain - keep in step with renderPunch().
                 region.process(parts.punch[0],parts.punch[1],voiceTime);
                 splitWeight[size_t(i)]=splitTrim.next(voiceTime,voice.punchEnd,r.punchRegion.splitPercent,r.punchRegion.transitionMs);
                 if(!r.eqPost[0])eq[1].process(parts.punch[0],parts.punch[1]);
@@ -260,44 +337,73 @@ private:
             if(distort){distortion[0].process(p,count,r.distortion[0]);distortion[1].process(t,count,r.distortion[1]);}
             for(int i=0;i<count;++i) {
                 const float envelopeGain=envelope.next();
-                auto& bin=k.envelope.bins[(std::min)(bins-1,(start+size_t(i))*bins/frames)];
-                std::array<float,2> out{};
                 // v0.5.20 EQ POSITION: after the distortion, the Tail EQ covers the whole Tail + Reverb bus.
                 std::array<float,2> punchBus{{p.getSample(0,i),p.getSample(1,i)}},tailBus{{t.getSample(0,i),t.getSample(1,i)}};
                 if(r.eqPost[0])eq[1].process(punchBus[0],punchBus[1]);
                 if(r.eqPost[1])eq[0].process(tailBus[0],tailBus[1]);
-                const float w=splitWeight[size_t(i)],splitGain=tt::PunchSplitTrim::gain(r.splitNormalizeGains[0],r.splitNormalizeGains[1],w);
-                auto* busFrame=buses?&buses->frames[start+size_t(i)]:nullptr;
-                if(busFrame)(*busFrame)[4]=envelopeGain;
-                for(int ch=0;ch<2;++ch){const float raw=punchBus[size_t(ch)],punch=raw*splitGain,tail=tailBus[size_t(ch)]+(r.generated.distortWet?0.f:wetBuffer[size_t(i)][size_t(ch)]);
-                    peaks[0]=(std::max)(peaks[0],std::abs(punch));peaks[1]=(std::max)(peaks[1],std::abs(tail));
-                    peaks[2]=(std::max)(peaks[2],std::abs(raw*(1.f-w)));peaks[3]=(std::max)(peaks[3],std::abs(raw*w));
-                    if(busFrame){(*busFrame)[size_t(ch)]=punch;(*busFrame)[size_t(2+ch)]=tail;}
-                    out[size_t(ch)]=(punch*r.normalizeGains[0]+tail*r.normalizeGains[1])*envelopeGain;}
-                if(linearMono){preL[start+size_t(i)]=out[0];preR[start+size_t(i)]=out[1];continue;}
-                bassMono.process(out[0],out[1],r.bassMono,r.bassMonoHz,r.bassMonoMix);
-                limiter.process(out[0],out[1],r.limiter);
-                if(audio){audio->left[start+size_t(i)]=out[0];audio->right[start+size_t(i)]=out[1];}
-                for(float v:out){const float x=std::clamp(v,-1.0f,1.0f);bin.minimum=(std::min)(bin.minimum,x);bin.maximum=(std::max)(bin.maximum,x);}
+                std::array<float,2> tail{};
+                for(int ch=0;ch<2;++ch)tail[size_t(ch)]=tailBus[size_t(ch)]+(r.generated.distortWet?0.f:wetBuffer[size_t(i)][size_t(ch)]);
+                output.frame(start+size_t(i),punchBus,splitWeight[size_t(i)],tail,envelopeGain);
             }
         }
-        if(linearMono) {
+        if(!output.finish(rate,[&]{return threadShouldExit()||r.generation!=latest;}))return false;
+        if(buses)buses->punchSource=std::move(source);
+        return true;
+    }
+    // v0.5.32: the Punch bus again from a full render's punchSource, with the Tail +
+    // Reverb bus and envelope taken from its buses. Same objects, same call order
+    // and the same 256-frame blocks as render(), so the result is identical to a
+    // full render of this request - only much faster (no voice, reverb or tail work).
+    bool renderPunch(const PreviewRequest& r,const PreviewBuses& base,pt::KickOverview& k,std::array<float,4>& peaks,pt::Sample* audio=nullptr,PreviewBuses* buses=nullptr) {
+        const auto& source=*base.punchSource;
+        const size_t frames=base.frames.size();
+        k=source.timing;k.envelope={};
+        if(frames==0||source.punch.size()!=frames||source.time.size()!=frames)return true;
+        const double rate=base.rate;
+        constexpr int block=256;
+        tt::PunchSplitTrim splitTrim;splitTrim.prepare(rate,r.punchRegion.splitPercent,r.punchRegion.transitionMs);
+        tt::ParametricEQ eq[3];
+        for(int i=0;i<3;++i)eq[i].update(r.bands[size_t(i)],r.eqOn[size_t(i)],rate);
+        tt::PunchRegionDesign regionDesign;regionDesign.update(r.punchRegion,r.attackBands,r.attackEQ,r.decayBands,r.decayEQ,rate);
+        tt::PunchRegionEQ region;region.start(regionDesign,rate,source.punchEnd);
+        pt::PunchTransient transient;transient.prepare(rate);transient.setSettings(r.transient);
+        pt::StereoDistortion distortion;
+        juce::AudioBuffer<float> p(2,block);
+        const bool distort=r.distortion[0].enabled||r.distortion[1].enabled;
+        if(distort)distortion.prepare(rate,block);
+        // The same settling run as render(): the three EQs in series on silence, then the transient.
+        for(int warm=0;warm<int(rate*.15);warm+=block) {
             if(threadShouldExit()||r.generation!=latest)return false;
-            const auto low=tt::bassmono::sideLowBand(preL,preR,r.bassMonoHz,rate);
-            const float mixAmount=std::clamp(r.bassMonoMix,0.f,1.f);
-            for(size_t f=0;f<frames;++f) {
-                std::array<float,2> out{float(preL[f]-mixAmount*low[f]),float(preR[f]+mixAmount*low[f])};
-                limiter.process(out[0],out[1],r.limiter);
-                if(audio){audio->left[f]=out[0];audio->right[f]=out[1];}
-                auto& bin=k.envelope.bins[(std::min)(bins-1,f*bins/frames)];
-                for(float v:out){const float x=std::clamp(v,-1.0f,1.0f);bin.minimum=(std::min)(bin.minimum,x);bin.maximum=(std::max)(bin.maximum,x);}
+            p.clear();
+            for(int i=0;i<block;++i) {float l=0,rr=0;for(auto& e:eq)e.process(l,rr);transient.process(l,rr);}
+            if(distort)distortion.process(p,block,r.distortion[0]);
+        }
+        PreviewOutput output(r,rate,k,peaks,audio,buses,frames);
+        std::array<float,block> splitWeight{};
+        const float punchGain=r.layerMuted[0]?0.f:1.f;
+        for(size_t start=0;start<frames;start+=block) {
+            if(threadShouldExit()||r.generation!=latest)return false;
+            const int count=int((std::min)(size_t(block),frames-start));
+            for(int i=0;i<count;++i) {
+                const size_t f=start+size_t(i);const double voiceTime=source.time[f];
+                std::array<float,2> punch=source.punch[f];
+                region.process(punch[0],punch[1],voiceTime);
+                splitWeight[size_t(i)]=splitTrim.next(voiceTime,source.punchEnd,r.punchRegion.splitPercent,r.punchRegion.transitionMs);
+                if(!r.eqPost[0])eq[1].process(punch[0],punch[1]);
+                transient.process(punch[0],punch[1]);
+                punch[0]*=punchGain;punch[1]*=punchGain;
+                p.setSample(0,i,punch[0]);p.setSample(1,i,punch[1]);
             }
-            if(buses){
-                if(threadShouldExit()||r.generation!=latest)return false;
-                buses->monoLow=previewBusLowBands(*buses,r.bassMonoHz);
+            if(distort)distortion.process(p,count,r.distortion[0]);
+            for(int i=0;i<count;++i) {
+                const size_t f=start+size_t(i);const auto& x=base.frames[f];
+                std::array<float,2> punchBus{{p.getSample(0,i),p.getSample(1,i)}};
+                if(r.eqPost[0])eq[1].process(punchBus[0],punchBus[1]);
+                output.frame(f,punchBus,splitWeight[size_t(i)],{{x[2],x[3]}},x[4]);
             }
         }
-        for(auto& b:k.envelope.bins){if(b.minimum>b.maximum)b={};k.envelope.peak=(std::max)({k.envelope.peak,std::abs(b.minimum),std::abs(b.maximum)});}
+        if(!output.finish(rate,[&]{return threadShouldExit()||r.generation!=latest;}))return false;
+        if(buses)buses->punchSource=base.punchSource;
         return true;
     }
 };

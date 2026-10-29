@@ -1103,6 +1103,34 @@ struct PunchTailEditorTest {
          same=true;for(size_t i=0;same && i<before.bins.size();++i)same=before.bins[i].minimum==d.kick.envelope.bins[i].minimum&&before.bins[i].maximum==d.kick.envelope.bins[i].maximum;
          check(same && std::abs(d.outputDb[0])<1e-9,"Waveform did not follow a volume change from outside the drag at once");
          refresh(e);}
+        // v0.5.32 live Punch chain: ATTACK / DECAY GAIN (and the other Punch-chain
+        // controls) redo only the Punch from the shown render, so the waveform follows
+        // a drag; the result equals a full render of the same settings.
+        {auto& d=e.completedKick;refresh(e);
+         check(e.fullPreviewGeneration!=0 && e.shownFullGeneration==e.fullPreviewGeneration && d.renderedBuses() && d.renderedBuses()->punchSource,
+               "The shown render must be the latest full render and keep its Punch source");
+         const auto before=d.kick.envelope;const auto full=e.fullPreviewGeneration;
+         e.setParameter("punchRegionOn",1);e.setParameter("punchAttackGain",9);e.setParameter("punchDecayGain",-12);
+         e.timerCallback();
+         check(e.previewGeneration!=full && e.fullPreviewGeneration==full,"An ATTACK / DECAY GAIN change did not start a Punch-only render");
+         refresh(e);
+         check(e.shownFullGeneration==full && d.renderedBuses() && d.renderedBuses()->punchSource,"The Punch-only render did not take over");
+         const auto quick=d.kick.envelope;const auto quickAudio=d.renderedAudio();
+         bool changed=quick.bins.size()==before.bins.size()&&quick.peak!=before.peak;
+         for(size_t i=0;!changed && i<quick.bins.size();++i)changed=quick.bins[i].maximum!=before.bins[i].maximum;
+         check(changed && quickAudio,"ATTACK / DECAY GAIN did not change the Final Kick waveform");
+         e.setParameter("punchAttackGain",3);e.timerCallback();
+         check(e.fullPreviewGeneration==full,"A second Punch-chain change must also be Punch-only");
+         e.setParameter("punchAttackGain",9);e.timerCallback();refresh(e);
+         e.setParameter("masterSustain",99);e.timerCallback();
+         check(e.fullPreviewGeneration!=full,"A change outside the Punch chain must start a full render");
+         e.setParameter("masterSustain",100);refresh(e);
+         check(e.shownFullGeneration==e.fullPreviewGeneration,"The full render did not take over");
+         bool same=quick.bins.size()==d.kick.envelope.bins.size()&&quick.peak==d.kick.envelope.peak;
+         for(size_t i=0;same && i<quick.bins.size();++i)same=quick.bins[i].minimum==d.kick.envelope.bins[i].minimum&&quick.bins[i].maximum==d.kick.envelope.bins[i].maximum;
+         check(same && d.renderedAudio() && d.renderedAudio()->left==quickAudio->left && d.renderedAudio()->right==quickAudio->right,
+               "The Punch-only render differs from a full render of the same settings");
+         e.setParameter("punchAttackGain",0);e.setParameter("punchDecayGain",0);e.setParameter("punchRegionOn",0);refresh(e);}
         // v0.5.21 ATTACK / DECAY NORMALIZE: each part on its own, the final peak (with the
         // whole-Punch trim on top) at -1 dBFS; the other part and the Tail are untouched.
         {check(e.splitNormalizeButtons[0].isVisible()&&e.splitNormalizeButtons[1].isVisible()&&e.splitNormalizeReset.isVisible(),"Attack / decay normalize buttons missing");

@@ -1,6 +1,7 @@
 #include "../Source/ProcessedPreview.h"
 #include <iostream>
 #include <stdexcept>
+#include <string>
 static void check(bool condition,const char* message){if(!condition)throw std::runtime_error(message);}
 static PreviewResult render(ProcessedPreview& worker,PreviewRequest request) {
     const auto generation=worker.submit(std::move(request));
@@ -108,7 +109,62 @@ int main()try {
                   <<(juce::Time::getMillisecondCounterHiRes()-t0)/10<<" ms\n";
      }
     }
+    // v0.5.32 Punch-only render: a request whose Punch chain changed (Punch Attack/
+    // Decay gains, EQs, split, trims, Punch EQ and its position, transient, Punch
+    // distortion), rendered from an earlier render's buses, equals a full render of
+    // that request sample for sample - waveform, export audio, buses and peaks.
+    {auto tailAsset=std::make_shared<pt::Sample>();tailAsset->rate=44100;tailAsset->left.resize(26460);tailAsset->right.resize(26460);
+     for(size_t i=0;i<tailAsset->left.size();++i){const double t=double(i)/44100;tailAsset->left[i]=float(.5*std::exp(-t*3)*std::sin(2*pt::pi*55*t));tailAsset->right[i]=float(.45*std::exp(-t*3)*std::sin(2*pt::pi*55*t+.3));}
+     auto punchAsset=std::make_shared<pt::Sample>();punchAsset->rate=44100;punchAsset->left.resize(6615);punchAsset->right.resize(6615);
+     for(size_t i=0;i<punchAsset->left.size();++i){const double t=double(i)/44100,f=60+900*std::exp(-t*40);punchAsset->left[i]=float(.7*std::exp(-t*12)*std::sin(2*pt::pi*f*t));punchAsset->right[i]=float(.6*std::exp(-t*12)*std::sin(2*pt::pi*f*t+.2));}
+     // Empty = identical, else what differs first.
+     auto differs=[](const PreviewResult& a,const PreviewResult& b)->std::string{
+         if(!a.audio||!b.audio||a.audio->left.size()!=b.audio->left.size())return "audio length";
+         for(size_t i=0;i<a.audio->left.size();++i)if(a.audio->left[i]!=b.audio->left[i]||a.audio->right[i]!=b.audio->right[i])
+             return "audio at frame "+std::to_string(i)+" ("+std::to_string(a.audio->left[i])+" vs "+std::to_string(b.audio->left[i])+")";
+         if(a.processedPeaks!=b.processedPeaks)return "peaks";
+         if(a.kick.totalMs!=b.kick.totalMs||a.kick.punchEndMs!=b.kick.punchEndMs||a.kick.tailStartMs!=b.kick.tailStartMs)return "timing";
+         if(a.kick.envelope.peak!=b.kick.envelope.peak||a.kick.envelope.bins.size()!=b.kick.envelope.bins.size())return "waveform peak";
+         for(size_t i=0;i<a.kick.envelope.bins.size();++i)if(a.kick.envelope.bins[i].minimum!=b.kick.envelope.bins[i].minimum||a.kick.envelope.bins[i].maximum!=b.kick.envelope.bins[i].maximum)return "waveform column "+std::to_string(i);
+         if(!a.buses||!b.buses||a.buses->frames!=b.buses->frames)return "buses";
+         if(a.buses->monoLow!=b.buses->monoLow)return "mono low bands";
+         return {};};
+     auto identical=[&](const PreviewResult& a,const PreviewResult& b){return differs(a,b).empty();};
+     const auto variants=[&](PreviewRequest r,int v){
+         if(v>=1){r.punchRegion.enabled=true;r.punchRegion.attackGainDb=6;r.punchRegion.decayGainDb=-9;r.punchRegion.splitPercent=30;r.punchRegion.transitionMs=3;}
+         if(v>=2){r.attackEQ=true;r.attackBands[0].enabled=true;r.attackBands[0].type=tt::Bell;r.attackBands[0].hz=3000;r.attackBands[0].gain=8;
+                  r.decayEQ=true;r.decayBands[0].enabled=true;r.decayBands[0].type=tt::LowShelf;r.decayBands[0].hz=120;r.decayBands[0].gain=-6;
+                  r.splitNormalizeGains={{1.6f,.4f}};r.eqOn[1]=true;r.bands[1][1].enabled=true;r.bands[1][1].type=tt::Bell;r.bands[1][1].hz=400;r.bands[1][1].gain=-5;}
+         if(v>=3){r.transient.enabled=true;r.transient.attack=40;r.transient.outputDb=-2;r.distortion[0].driveDb=18;r.distortion[0].type=2;r.distortion[0].outputDb=-1;r.distortion[0].toneHz=9000;}
+         if(v>=4)r.eqPost[0]=true;
+         if(v==5){r.punchRegion.attackGainDb=-12;r.punchRegion.decayGainDb=12;r.punchRegion.splitPercent=55;}
+         return r;};
+     // Punch distortion ON/OFF is NOT Punch-only: either distortion being on runs both
+     // lanes through the 4x oversampling (matched delay), so it changes the Tail bus too.
+     // The editor sends it as a full render; here it is part of each mode's base.
+     for(int mode=0;mode<4;++mode) {   // 0 limiter, 1 IIR mono bass (no distortion), 2 linear mono bass, 3 Tail distortion + distorted wet, no limiter
+         auto base=request;base.samples={};base.samples[0]=punchAsset;base.samples[1]=tailAsset;base.distortion={};
+         base.limiter=mode!=3;base.bassMono=mode==1||mode==2;base.bassMonoLinear=mode==2;base.bassMonoHz=140;base.bassMonoMix=.9f;
+         base.distortion[0].enabled=mode!=1;
+         if(mode==3){base.distortion[1].enabled=true;base.distortion[1].driveDb=20;base.generated.distortWet=true;}
+         const auto from=render(worker,base);
+         check(from.buses&&from.buses->punchSource&&from.buses->punchSource->punch.size()==from.buses->frames.size(),"Full render did not keep the Punch source");
+         auto previous=from;double fullMs=0,punchMs=0;
+         for(int v=0;v<=5;++v) {
+             const auto to=variants(base,v);
+             auto t0=juce::Time::getMillisecondCounterHiRes();const auto full=render(worker,to);fullMs+=juce::Time::getMillisecondCounterHiRes()-t0;
+             auto fast=to;fast.punchBase=previous.buses;
+             t0=juce::Time::getMillisecondCounterHiRes();const auto quick=render(worker,fast);punchMs+=juce::Time::getMillisecondCounterHiRes()-t0;
+             if(const auto why=differs(full,quick);!why.empty())
+                 throw std::runtime_error("Punch-only render differs from a full render (mode "+std::to_string(mode)+", variant "+std::to_string(v)+"): "+why);
+             check(!quick.request.punchBase && quick.buses->punchSource==from.buses->punchSource,"Punch-only render must reuse the Punch source and drop its base");
+             previous=quick;   // chained: the next variant starts from this Punch-only render
+         }
+         check(!identical(from,previous),"Punch chain changes had no effect");
+         std::cout<<"punch-only render (mode "<<mode<<", "<<from.buses->frames.size()<<" frames): "<<punchMs/6<<" ms, full "<<fullMs/6<<" ms\n";
+     }
+    }
     request.samples={};auto empty=render(worker,request);check(empty.kick.envelope.bins.empty(),"Unloaded waveform not cleared");
-    std::cout<<"PASS background preview: bypass, transient, EQ, distortion, routing, duration, coalescing and unload\n";
+    std::cout<<"PASS background preview: bypass, transient, EQ, distortion, routing, duration, coalescing, unload, volume remix and Punch-only render\n";
     return 0;
 }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}

@@ -1933,10 +1933,18 @@ void PunchTailEditor::timerCallback() {
     auto nextPhase=proc.previewPhase();
     const bool phaseChanged=nextPhase != displayedPhase;
     std::vector<float> effectParams{proc.tailWetUsesLinearPhase()?1.f:0.f,proc.tailWetUsesSubMono()?1.f:0.f,proc.bassMonoUsesLinearPhase()?1.f:0.f};
+    // v0.5.32: the Punch chain (Punch Attack/Decay incl. its gains and trims, Punch
+    // EQ and its position, transient, Punch distortion settings) touches only the
+    // Punch bus. Punch distortion ON is not in it: switching it also switches the
+    // Tail lane's matched 4x oversampling delay, so it needs a full render.
+    std::vector<float> punchParams;
     for(auto* parameter:proc.getParameters())if(auto* p=dynamic_cast<juce::RangedAudioParameter*>(parameter)) {
         const auto id=p->paramID;
-        if(id.startsWith("transient")||id.startsWith("punchDist")||id.startsWith("tailDist")||
-           id.startsWith("master")||id.startsWith("eq")||id.startsWith("punchEq")||id.startsWith("punchRegion")||id.startsWith("punchAttack")||id.startsWith("punchDecay")||id.startsWith("reverbEq")||id.startsWith("tailVerb")||id.startsWith("punchVerb")||id.startsWith("verbPunchDuck")||id.startsWith("crunch")||id.startsWith("tailEnd")||id=="mutePunch"||id=="muteTail"||id=="muteReverb"||id=="outputLimiter"||id=="tailEqPost"||id.startsWith("attackLayer")||id.startsWith("bassMono"))effectParams.push_back(p->getValue());
+        if(id=="punchDistOn")effectParams.push_back(p->getValue());
+        else if(id.startsWith("transient")||id.startsWith("punchDist")||id.startsWith("punchEq")||id.startsWith("punchRegion")||id.startsWith("punchAttack")||id.startsWith("punchDecay"))
+            punchParams.push_back(p->getValue());
+        else if(id.startsWith("tailDist")||id.startsWith("master")||id.startsWith("eq")||id.startsWith("reverbEq")||id.startsWith("tailVerb")||id.startsWith("punchVerb")||id.startsWith("verbPunchDuck")||id.startsWith("crunch")||id.startsWith("tailEnd")||id=="mutePunch"||id=="muteTail"||id=="muteReverb"||id=="outputLimiter"||id=="tailEqPost"||id.startsWith("attackLayer")||id.startsWith("bassMono"))
+            effectParams.push_back(p->getValue());
     }
     const double previewRate=proc.getSampleRate()>0?proc.getSampleRate():44100;
     // v0.5.28: Punch / Tail normalize gains are tracked apart. The waveform remixes
@@ -1945,7 +1953,8 @@ void PunchTailEditor::timerCallback() {
     std::array<float,2> normalizeGains{};
     for(int i=0;i<2;++i)normalizeGains[size_t(i)]=juce::Decibels::decibelsToGain(proc.params.getRawParameterValue(i==0?"punchNormalize":"tailNormalize")->load());
     const bool gainsChanged=normalizeGains!=lastNormalizeGains && !completedKick.outputDragActive();
-    const bool parameterChanged = previewParams != lastPreviewParams || effectParams!=lastEffectParams || previewRate!=lastPreviewRate || gainsChanged;
+    const bool otherChanged = previewParams != lastPreviewParams || effectParams!=lastEffectParams || previewRate!=lastPreviewRate || gainsChanged;
+    const bool parameterChanged = otherChanged || punchParams!=lastPunchParams;
     if (changed) repaint(); // Update filenames and individual source-duration labels.
     if (changed || bankChanged || phaseChanged || parameterChanged) {
         // Update trim overlays on both original full-length sample waveforms.
@@ -2020,15 +2029,23 @@ void PunchTailEditor::timerCallback() {
         const char* eqIds[]={"eqOn","punchEqOn","reverbEqOn"};
         for(int i=0;i<3;++i){request.bands[size_t(i)]=proc.eqSettings(i);request.eqOn[size_t(i)]=proc.params.getRawParameterValue(eqIds[i])->load()>.5f;}
         request.eqPost={{proc.eqAfterDistortion(0),proc.eqAfterDistortion(1)}};   // v0.5.20
+        // v0.5.32: only the Punch chain changed and the shown render belongs to the
+        // latest full render -> redo just the Punch (fast, so it follows a drag).
+        const auto punchBase=completedKick.renderedBuses();
+        const bool punchOnly=!changed && !bankChanged && !phaseChanged && !otherChanged && punchBase && punchBase->punchSource &&
+                             fullPreviewGeneration!=0 && shownFullGeneration==fullPreviewGeneration;
+        if(punchOnly){request.punchBase=punchBase;request.baseGeneration=fullPreviewGeneration;}
         previewGeneration=previewWorker.submit(std::move(request));completedKick.updating=true;completedKick.refreshExportState();completedKick.repaint();
-        lastEffectParams=std::move(effectParams);lastPreviewRate=previewRate;lastNormalizeGains=normalizeGains;
+        if(!punchOnly)fullPreviewGeneration=previewGeneration;
+        lastEffectParams=std::move(effectParams);lastPunchParams=std::move(punchParams);lastPreviewRate=previewRate;lastNormalizeGains=normalizeGains;
         displayedPreparedPunch=nextPreparedPunch;
         displayedBank = std::move(nextBank);displayedCrunch=nextCrunch;
         displayedTailWet=nextTailWet;
         displayedPhase = std::move(nextPhase);
         lastPreviewParams = previewParams;
     }
-    if(auto result=previewWorker.take())if(result->request.generation==previewGeneration){processedPeaks=result->processedPeaks;completedKick.setRendered(*result);}
+    if(auto result=previewWorker.take())if(result->request.generation==previewGeneration){processedPeaks=result->processedPeaks;completedKick.setRendered(*result);
+        shownFullGeneration=result->request.baseGeneration!=0?result->request.baseGeneration:result->request.generation;}
     if(!completedKick.outputDragActive())completedKick.showOutputGains(normalizeGains);   // v0.5.28: automation, NORMALIZE, mouse-up
     for(int i=0;i<2;++i) {
         normalizeButtons[size_t(i)].setEnabled(!completedKick.updating && processedPeaks[size_t(i)]>1.e-7f);

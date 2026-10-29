@@ -5,6 +5,13 @@ same plugin (plugin code `TaA2`).
 A new version replaces the installed one, and projects from earlier versions
 open unchanged.
 
+## 0.5.32
+- The Final Kick waveform now follows ATTACK GAIN and DECAY GAIN while you drag
+  them. The same goes for the other Punch-only controls: Punch Attack / Decay
+  (split, transition, EQs, Norm Attack / Norm Decay), Punch EQ, the transient
+  shaper and the Punch distortion settings. Only the Punch is redrawn, so it keeps up with the
+  mouse; the picture and Export WAV are exactly what a full redraw gives.
+
 ## 0.5.31
 - PUNCH 2 OFFSET now moves the way you drag: right (+) moves Punch 2 later,
   left (-) moves it earlier. Projects saved with an earlier version are
