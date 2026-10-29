@@ -391,7 +391,7 @@ TailtoneDefaultsPage::TailtoneDefaultsPage() {
     for(auto [l,text]:labels){l->setText(text,juce::dontSendNotification);l->setFont(juce::Font(14.0f,juce::Font::bold));addAndMakeVisible(*l);}
     for(auto* c:{&engineBox,&punchModeBox,&reverbEngineBox,&uiSizeBox})addAndMakeVisible(*c);
     statusLabel.setFont(juce::Font(14.0f));addAndMakeVisible(statusLabel);
-    saveCurrentButton.setTooltip("Use the settings of this Kicktone as the start for every new one. Settings that belong to one sample (tail root, trims, offsets, output trims) are not stored.");
+    saveCurrentButton.setTooltip("Use the settings of this Kicktone as the start for every new one. Settings that belong to one sample (tail root, trims, offsets, output trims) and EQ settings are not stored: every EQ starts neutral.");
     factoryButton.setTooltip("Forget your own defaults: new Kicktones start with the factory settings again.");
     saveCurrentButton.onClick=[this]{if(state&&processor){auto m=tt::defaults::capture(*state,*processor);
         for(auto it=m.begin();it!=m.end();)it=std::abs(it->second-tt::defaults::factory(*state,it->first))<1.e-6f?m.erase(it):std::next(it);
@@ -446,7 +446,7 @@ void TailtoneDefaultsPage::paint(juce::Graphics& g) {
     g.setColour(thinLine);g.drawHorizontalLine(66,28,float(getWidth()-28));
     g.setColour(whiteAccent);g.setFont(juce::Font(16.0f));
     g.drawFittedText("The settings a NEW Kicktone starts with, saved on this computer for every new instance. Projects and presets you open keep their own settings. "
-        "Until you change something here, the factory defaults are used.",28,80,getWidth()-56,48,juce::Justification::topLeft,2);
+        "Until you change something here, the factory defaults are used. EQs always start neutral.",28,80,getWidth()-56,48,juce::Justification::topLeft,2);
     const auto card=[&](juce::Rectangle<int> r,const char* title,juce::Colour edge){
         g.setColour(panel);g.fillRoundedRectangle(r.toFloat(),9);g.setColour(edge);g.fillRoundedRectangle(r.withWidth(4).toFloat(),2);
         g.setColour(edge);g.setFont(juce::Font(13.0f,juce::Font::bold));g.drawText(title,r.getX()+24,r.getY()+16,r.getWidth()-48,18,juce::Justification::centredLeft);};

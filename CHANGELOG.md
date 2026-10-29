@@ -5,6 +5,12 @@ same plugin (plugin code `TaA2`).
 A new version replaces the installed one, and projects from earlier versions
 open unchanged.
 
+## 0.5.30
+- Every EQ starts neutral in a new Kicktone, also when you have saved your own
+  default settings: SAVE CURRENT on the Defaults page no longer stores EQ bands
+  or EQ on/off switches, and EQ values saved by earlier versions are ignored.
+  Your other saved defaults keep working. Projects keep their own EQ settings.
+
 ## 0.5.29
 - Renamed from Tailtone to **Kicktone** (same plugin ID and settings format).
   The installer removes the old Tailtone.vst3 so the DAW lists the plugin only

@@ -1338,6 +1338,33 @@ struct PunchTailEditorTest {
            for(const auto& [id,val]:m)check(std::abs(val-tt::defaults::factory(p.params,id))>1e-6f,"SAVE CURRENT stored a factory value");
            check(d.toggles.size()>0&&toggle("glide").getToggleState(),"Page not refreshed after SAVE CURRENT");
            g->setValueNotifyingHost(0.f);r->setValueNotifyingHost(rootBefore);}
+          // v0.5.30: every EQ is neutral at factory and never a custom default.
+          {using tt::defaults::isEq;
+           for(const char* id:{"eqOn","eq2Gain","eq7Slope","punchEqOn","punchEq0Freq","reverbEq3Q","tailVerbEqOn","tailVerbEq1Gain","punchVerbEq4Type","punchAttackEqOn","punchAttackEq3On","punchDecayEq4Gain"})
+               check(isEq(id)&&!tt::defaults::storable(id),"EQ parameter would become a custom default");
+           for(const char* id:{"eqView","eqGeneratedView","eqPunchGeneratedView","punchEqPost","tailEqPost","reverbExtra","punchRegionOn","punchAttackGain","punchDecayGain","tailVerbSubMono","punchRegionSplit"})
+               check(!isEq(id),"Non-EQ parameter treated as EQ");
+           int eqGains=0;
+           for(auto* parameter:p.getParameters())if(auto* rp=dynamic_cast<juce::RangedAudioParameter*>(parameter))
+               if(isEq(rp->paramID)&&rp->paramID.endsWith("Gain")){++eqGains;check(rp->convertFrom0to1(rp->getDefaultValue())==0.f,"An EQ band does not start at 0 dB");}
+           check(eqGains==7*tt::kBands,"Expected 7 EQs of 8 bands");
+           std::vector<std::pair<juce::RangedAudioParameter*,float>> before;
+           for(const char* id:{"eq2Gain","punchEq1Gain","punchAttackEq3On","tailVerbEq0Gain","punchDecayEqOn"}){auto* q=p.params.getParameter(id);before.push_back({q,q->getValue()});}
+           p.params.getParameter("eq2Gain")->setValueNotifyingHost(p.params.getParameter("eq2Gain")->convertTo0to1(8.5f));
+           p.params.getParameter("punchEq1Gain")->setValueNotifyingHost(p.params.getParameter("punchEq1Gain")->convertTo0to1(-6.f));
+           p.params.getParameter("punchAttackEq3On")->setValueNotifyingHost(1.f);p.params.getParameter("tailVerbEq0Gain")->setValueNotifyingHost(p.params.getParameter("tailVerbEq0Gain")->convertTo0to1(4.f));
+           p.params.getParameter("punchDecayEqOn")->setValueNotifyingHost(0.f);
+           d.saveCurrentButton.onClick();
+           for(const auto& [id,val]:tt::defaults::load())check(!isEq(id),"SAVE CURRENT stored an EQ setting");
+           for(auto& [q,v]:before)q->setValueNotifyingHost(v);
+           // EQ entries saved by an older version are ignored; the rest still apply.
+           tt::defaults::memoryStore()={{"eq2Gain",8.5f},{"eq3On",1.f},{"punchDecayEq3On",1.f},{"punchAttackEq5Gain",6.5f},{"glide",1.f}};
+           check(tt::defaults::load().size()==1&&tt::defaults::load().count("glide"),"Stored EQ entries were not ignored");
+           auto freshOwner=std::make_unique<PunchTailProcessor>();auto& fresh=*freshOwner;
+           check(fresh.applyUserDefaults()==1,"Only the non-EQ default may apply");
+           auto v=[&](const char* id){return fresh.params.getRawParameterValue(id)->load();};
+           check(v("glide")==1&&v("eq2Gain")==0&&v("eq3On")==0&&v("punchDecayEq3On")==0&&v("punchAttackEq5Gain")==0,"A new instance did not start with neutral EQs");
+           tt::defaults::clear();d.refresh();}
           if(snapshot){juce::FileOutputStream out{juce::File(juce::String::fromUTF8(snapshot)).getSiblingFile(juce::File(juce::String::fromUTF8(snapshot)).getFileNameWithoutExtension()+"-defaults.png")};
               out.setPosition(0);out.truncate();check(juce::PNGImageFormat().writeImageToStream(e.createComponentSnapshot(e.getLocalBounds()),out),"Cannot render defaults snapshot");}
           d.factoryButton.onClick();check(tt::defaults::load().empty()&&d.statusText().startsWith("Factory defaults")&&!toggle("punchLayer").getToggleState()&&d.engineBox.getSelectedId()==1,"FACTORY DEFAULTS did not reset");

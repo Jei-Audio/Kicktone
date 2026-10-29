@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Tailtone VERSION 0.5.29 LANGUAGES C CXX)
+project(Tailtone VERSION 0.5.30 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # v0.5.24: link the MSVC C++ runtime into every binary (/MT, /MTd for Debug), so
