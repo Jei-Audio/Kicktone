@@ -5,6 +5,10 @@ same plugin (plugin code `TaA2`).
 A new version replaces the installed one, and projects from earlier versions
 open unchanged.
 
+## 0.5.34
+- With Punch 2 on, the Punch Attack / Decay waveform also shows Punch 2 in
+  purple after the split, and its decay side is purple ("DECAY - PUNCH 2").
+
 ## 0.5.33
 - With Punch 2 on, the PUNCH waveform shows Punch 2 in purple where it plays:
   from ATTACK END on, moved by PUNCH 2 OFFSET. Punch 1 is drawn only up to

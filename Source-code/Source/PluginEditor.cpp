@@ -1500,7 +1500,7 @@ PunchTailEditor::PunchTailEditor(PunchTailProcessor& p)
     regionSplit.enableStepButtons(1.0);regionTransition.enableStepButtons(0.1);attackGain.enableStepButtons(0.1);decayGain.enableStepButtons(0.1); // v0.4.60
     regionSplit.setTooltip("Where the attack ends and the decay begins, as a percentage of the punch. You can also drag the line on the small waveform; hold Shift to move it slowly.");
     regionTransition.setTooltip("How smoothly the attack and decay settings blend into each other around the split, 0-20 ms. The punch length does not change.");
-    punchRegionWave.setTooltip("The current punch. Drag the line: the attack is before it, the decay after it. Hold Shift to move it slowly.");
+    punchRegionWave.setTooltip("The current punch. Drag the line: the attack is before it, the decay after it. Hold Shift to move it slowly. With Punch 2 on, the purple decay side is Punch 2.");
     punchRegionEnable.setTooltip("Turn on separate EQ and volume for the attack and the decay of the punch. Off: the punch plays as normal.");
     regionEnableAttachment=std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(proc.params,"punchRegionOn",punchRegionEnable);
     regionSplitAttachment=std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.params,"punchRegionSplit",regionSplit);
@@ -1970,6 +1970,7 @@ void PunchTailEditor::timerCallback() {
     const double sourceEnd=displayed[0]?(std::max)(0.,displayed[0]->sample.duration()*1000-previewParams[3]):0.;
     const auto region=proc.punchRegionSettings();
     punchRegionWave.setAudio(displayed[0],sourceEnd,regionScale,region.splitPercent,region.transitionMs,region.enabled);
+    punchRegionWave.setLayer(punchLayerShown()?proc.asset(3):nullptr,proc.params.getRawParameterValue("punch2Offset")->load());   // v0.5.33
     attackEQButton.setEnabled(sourceEnd>0);decayEQButton.setEnabled(sourceEnd>0);
     const auto nextCrunch=proc.previewCrunch();
     const bool bankChanged = nextBank != displayedBank || nextPreparedPunch!=displayedPreparedPunch || nextTailWet!=displayedTailWet || nextCrunch!=displayedCrunch;
