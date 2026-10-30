@@ -286,15 +286,35 @@ void PunchTailWaveform::paint(juce::Graphics& g) {
         g.restoreState();
     };
     constexpr double kAll=1.e301;
-    if(!layerShown) drawWave(envelope,durationMs,0.0,-kAll,kAll,accent);
+    // v0.5.35 (Punch and Tail views): the parts that are not played - after the
+    // Punch END, before the Tail START and after the Tail END cut - are drawn in
+    // the palette's dark waveOff colour instead of a dimmed accent.
+    const bool darkOff=!isReverb;
+    const double selFrom=isPunch?0.0:std::clamp(guideMs,0.0,durationMs);
+    const double selTo=(std::max)(selFrom,isPunch?markerMs():hasEndHandle()&&endGuideMs>0?std::clamp(durationMs-endGuideMs,0.0,durationMs):kAll);
+    if(darkOff) {
+        g.setColour(bg.withAlpha(isPunch?0.68f:0.57f));
+        const float a=std::clamp(msToX(selFrom,plot),plot.getX(),plot.getRight());
+        const float b=selTo>=kAll?plot.getRight():std::clamp(msToX(selTo,plot),plot.getX(),plot.getRight());
+        if(!isPunch)g.fillRect(plot.getX(),plot.getY(),a-plot.getX(),plot.getHeight());
+        if(isPunch||selTo<kAll)g.fillRect(b,plot.getY(),plot.getRight()-b,plot.getHeight());
+    }
+    const auto drawPart=[&](const pt::WaveformEnvelope& env,double envMs,double shiftMs,double fromMs,double toMs,juce::Colour colour) {
+        if(!darkOff){drawWave(env,envMs,shiftMs,fromMs,toMs,colour);return;}
+        const auto off=tt::ui::pal().waveOff;
+        drawWave(env,envMs,shiftMs,fromMs,(std::min)(toMs,selFrom),off);
+        drawWave(env,envMs,shiftMs,(std::max)(fromMs,selFrom),(std::min)(toMs,selTo),colour);
+        if(selTo<kAll)drawWave(env,envMs,shiftMs,(std::max)(fromMs,selTo),toMs,off);
+    };
+    if(!layerShown) drawPart(envelope,durationMs,0.0,-kAll,kAll,accent);
     else {
         // v0.5.33: what the punch plays with the Punch layer on (see rebuildPunch's
         // mix): Punch 1 until ATTACK END, Punch 2 after it; inside the TRANSITION
         // both are heard. Punch 1 after the transition is not heard: not drawn.
         const double splitMs=layerSplitMs();
         const double fadeMs=(std::max)(layerTransitionMs,1000.0/(std::max)(1.0,sample->sample.rate));
-        drawWave(envelope,durationMs,0.0,-kAll,splitMs+fadeMs*.5,accent);
-        drawWave(layerEnvelope,layerSample->sample.duration()*1000.0,layerOffsetMs,splitMs-fadeMs*.5,kAll,tt::ui::pal().punch2);
+        drawPart(envelope,durationMs,0.0,-kAll,splitMs+fadeMs*.5,accent);
+        drawPart(layerEnvelope,layerSample->sample.duration()*1000.0,layerOffsetMs,splitMs-fadeMs*.5,kAll,tt::ui::pal().punch2);
     }
 
     // Trim overlays and handles use the original full sample duration.
@@ -303,9 +323,11 @@ void PunchTailWaveform::paint(juce::Graphics& g) {
         const float marker = msToX(markerMs(), plot);
         const float left=plot.getX(),right=plot.getRight();
         const float clipped=std::clamp(marker,left,right);
-        g.setColour(bg.withAlpha(isPunch ? 0.68f : 0.57f));
-        if (isPunch) g.fillRect(clipped, plot.getY(), right - clipped, plot.getHeight());
-        else g.fillRect(left, plot.getY(), clipped - left, plot.getHeight());
+        if(!darkOff) {   // Punch / Tail dim their background before the waveform (above)
+            g.setColour(bg.withAlpha(isPunch ? 0.68f : 0.57f));
+            if (isPunch) g.fillRect(clipped, plot.getY(), right - clipped, plot.getHeight());
+            else g.fillRect(left, plot.getY(), clipped - left, plot.getHeight());
+        }
         const bool markerVisible=marker>=left-4 && marker<=right+4;
         if(markerVisible) {
             g.setColour(titleColour.withAlpha(0.80f));
@@ -328,9 +350,6 @@ void PunchTailWaveform::paint(juce::Graphics& g) {
             const double cutMs=std::clamp(durationMs-endGuideMs,0.0,durationMs);
             const float endX=msToX(cutMs,plot);
             if(endGuideMs>0) {
-                g.setColour(bg.withAlpha(0.68f));
-                const float from=std::clamp(endX,left,right);
-                g.fillRect(from,plot.getY(),right-from,plot.getHeight());
                 const double fadeStartMs=(std::max)(cutMs-endFadeMs,guideMs);
                 const float fadeX=msToX(fadeStartMs,plot);
                 g.setColour(accent.withAlpha(0.9f));

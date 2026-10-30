@@ -241,8 +241,54 @@ struct PunchTailEditorTest {
         {auto tailOwner=std::make_unique<PunchTailWaveform>(false);tailOwner->setLayer(p2,50,2,0);check(!tailOwner->showsLayer(),"Only the Punch view shows Punch 2");}
         std::cout<<"PASS Punch 2 on the Punch waveform: purple after ATTACK END, no unheard Punch 1, offset direction, END trim, transition, Attack/Decay view, editor wiring\n";
     }
+    // v0.5.35: the parts of the Punch / Tail waveforms that are not played are dark
+    // grey (palette waveOff), not a dimmed accent colour.
+    static void unplayedDark(const char* snapshot) {
+        tt::ui::setTheme(0);
+        auto a=std::make_shared<PunchTailProcessor::Asset>();a->sample.rate=48000;a->sample.left.resize(4800);
+        for(size_t i=0;i<a->sample.left.size();++i)a->sample.left[i]=.8f*float(std::sin(2*pt::pi*200*double(i)/48000));
+        a->sample.right=a->sample.left;
+        const auto layer=[&]{auto b=std::make_shared<PunchTailProcessor::Asset>(*a);return b;}();
+        // Counts per kind of pixel in the plot between two file times (100 ms file).
+        struct Kinds{int accent=0,dark=0,purple=0;};
+        const auto kinds=[](PunchTailWaveform& w,double fromMs,double toMs){
+            const auto plot=w.plotArea().toFloat();
+            const auto image=w.createComponentSnapshot(w.getLocalBounds(),true,1.0f);
+            Kinds k;
+            const int x0=juce::roundToInt(plot.getX()+float(fromMs/100.0)*plot.getWidth()),x1=juce::roundToInt(plot.getX()+float(toMs/100.0)*plot.getWidth());
+            for(int x=x0;x<x1;++x)for(int y=int(plot.getCentreY())-30;y<int(plot.getCentreY())+30;++y){
+                const auto c=image.getPixelAt(x,y);const int r=c.getRed(),g=c.getGreen(),b=c.getBlue();
+                if(b>g+40&&b>r)++k.purple;else if((std::max)({r,g,b})<28)++k.dark;else if(r>150)++k.accent;}
+            return k;};
+        const auto save=[&](PunchTailWaveform& w,const char* suffix){if(!snapshot)return;
+            juce::FileOutputStream out{juce::File(juce::String::fromUTF8(snapshot)).getSiblingFile(juce::File(juce::String::fromUTF8(snapshot)).getFileNameWithoutExtension()+suffix)};
+            out.setPosition(0);out.truncate();check(juce::PNGImageFormat().writeImageToStream(w.createComponentSnapshot(w.getLocalBounds()),out),"Cannot render waveform snapshot");};
+        {auto pOwner=std::make_unique<PunchTailWaveform>(true);auto& p=*pOwner;p.setSize(612,200);p.setSample(a);
+         {const auto all=kinds(p,2,98);check(all.dark==0&&all.accent>0,"Untrimmed Punch must be all accent colour");}
+         p.setGuideMilliseconds(40);   // Punch END at 60 ms
+         {const auto kept=kinds(p,2,57),cut=kinds(p,63,98);
+          check(kept.accent>0&&kept.dark==0,"Played Punch part is not in the accent colour");
+          check(cut.dark>0&&cut.accent==0&&cut.purple==0,"Punch after END is not dark grey");}
+         p.setLayer(layer,50,2,0);   // Punch 2 from 50 ms: purple until END, dark after
+         {const auto heard=kinds(p,52,57),cut=kinds(p,63,98);
+          check(heard.purple>0&&heard.dark==0,"Heard Punch 2 is not purple");
+          check(cut.dark>0&&cut.purple==0&&cut.accent==0,"Punch 2 after END is not dark grey");}
+         save(p,"-punch-unplayed.png");}
+        {auto tOwner=std::make_unique<PunchTailWaveform>(false);auto& t=*tOwner;t.setSize(612,200);t.setSample(a);
+         t.setGuideMilliseconds(30);t.setEndGuide(20,10);   // START 30 ms, END cut at 80 ms
+         {const auto before=kinds(t,2,27),kept=kinds(t,33,77),after=kinds(t,83,98);
+          check(before.dark>0&&before.accent==0,"Tail before START is not dark grey");
+          check(kept.accent>0&&kept.dark==0,"Played Tail part is not in the accent colour");
+          check(after.dark>0&&after.accent==0,"Tail after the END cut is not dark grey");}
+         save(t,"-tail-unplayed.png");
+         t.setEndGuide(0,10);check(kinds(t,33,98).dark==0,"Tail without an END cut must be played to the end");}
+        {auto rOwner=std::make_unique<PunchTailWaveform>(false,true);auto& r=*rOwner;r.setSize(612,200);r.setSample(a);r.setGuideMilliseconds(30);
+         check(kinds(r,2,27).dark==0,"Reverb view must keep its old dimmed look");}
+        std::cout<<"PASS unplayed Punch / Tail waveform parts are dark grey (Punch END, Punch 2, Tail START and END cut), Reverb unchanged\n";
+    }
     static void run(const char* snapshot) {
-        punch2Waveform(snapshot);
+        punch2Waveform(snapshot);   // builds an editor first (loads the theme colours)
+        unplayedDark(snapshot);
         {
             PunchTailKickDisplay d;d.setSize(810,225);
             pt::Sample p;p.left.assign(4800,.2f);p.right=p.left;
