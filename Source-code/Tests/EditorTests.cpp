@@ -9,6 +9,7 @@ struct PunchTailPlaybackTest {
     static uint64_t requestGeneration(PunchTailProcessor& p,int slot){const juce::ScopedLock l(p.requestLock);return p.requestGenerations[size_t(slot)];}
     static juce::File pendingFile(PunchTailProcessor& p,int slot){const juce::ScopedLock l(p.requestLock);return p.requests[size_t(slot)].pending?p.requests[size_t(slot)].file:juce::File{};}
     static void clearRequest(PunchTailProcessor& p,int slot){const juce::ScopedLock l(p.requestLock);p.requests[size_t(slot)]={};}
+    static void setAsset(PunchTailProcessor& p,int slot,std::shared_ptr<PunchTailProcessor::Asset> a){const juce::ScopedLock l(p.assetLock);p.assets[size_t(slot)]=std::move(a);}
     static void setup(PunchTailProcessor& p){
         p.signalThreadShouldExit();p.notify();p.stopThread(-1);
         for(int slot=0;slot<2;++slot){
@@ -161,7 +162,63 @@ struct PunchTailEditorTest {
         e.tailWave.onTrim(80);check(std::abs(tailMs()-80)<.051 && punchMs()==punchBefore,"different files: trims must stay independent");
         std::cout<<"PASS LOCK SPLIT editor: shared cut both ways, one gesture, mouse drag, clamps, knobs, Final Kick handle, Detect, unlock, different files\n";
     }
+    // v0.5.33: Punch 2 drawn in purple on the Punch waveform where it plays;
+    // Punch 1 only up to ATTACK END (no faint copy of the unheard part).
+    static void punch2Waveform(const char* snapshot) {
+        tt::ui::setTheme(0);
+        const auto tone=[](double ms,float level){auto a=std::make_shared<PunchTailProcessor::Asset>();a->sample.rate=48000;
+            const size_t n=size_t(ms*48);a->sample.left.resize(n);
+            for(size_t i=0;i<n;++i)a->sample.left[i]=level*float(std::sin(2*pt::pi*200*double(i)/48000));
+            a->sample.right=a->sample.left;return a;};
+        // Editor wiring first (an editor also loads the theme colours the waveform draws with): PUNCH 2 ticked + loaded -> shown with the live split / transition / offset.
+        {auto procOwner=std::make_unique<PunchTailProcessor>();auto& p=*procOwner;PunchTailPlaybackTest::setup(p);
+         PunchTailPlaybackTest::setAsset(p,3,tone(60,.9f));
+         auto editorOwner=std::make_unique<PunchTailEditor>(p);auto& e=*editorOwner;e.timerCallback();
+         check(!e.punchWave.showsLayer(),"Punch 2 shown while the Punch layer is off");
+         const auto set=[&](const char* id,float v){auto* q=p.params.getParameter(id);q->setValueNotifyingHost(q->convertTo0to1(v));};
+         set("punchLayer",1);set("punchRegionSplit",35);set("punchRegionTransition",4);set("punch2Offset",-7);e.timerCallback();
+         check(e.punchWave.showsLayer()&&e.punchWave.layerSample==p.asset(3)&&std::abs(e.punchWave.layerSplitPercent-35)<.01&&
+               std::abs(e.punchWave.layerTransitionMs-4)<.01&&std::abs(e.punchWave.layerOffsetMs+7)<.01,"Editor does not pass Punch 2 and its settings to the Punch waveform");
+         set("punchLayer",0);e.timerCallback();check(!e.punchWave.showsLayer(),"Unticking the Punch layer did not hide Punch 2 on the waveform");}
+        auto wOwner=std::make_unique<PunchTailWaveform>(true);auto& w=*wOwner;w.setSize(612,200);   // plot 30..171: the END label (y 50..64) stays out of the counted band
+        const auto p1=tone(100,.5f),p2=tone(60,.9f);
+        w.setSample(p1);
+        const auto plot=w.plotArea().toFloat();
+        // Purple / amber pixels in the plot between two file times.
+        const auto count=[&](double fromMs,double toMs){
+            const auto image=w.createComponentSnapshot(w.getLocalBounds(),true,1.0f);
+            int purple=0,amber=0;
+            const int x0=juce::roundToInt(plot.getX()+float(fromMs/100.0)*plot.getWidth()),x1=juce::roundToInt(plot.getX()+float(toMs/100.0)*plot.getWidth());
+            for(int x=x0;x<x1;++x)for(int y=int(plot.getCentreY())-30;y<int(plot.getCentreY())+30;++y){
+                const auto c=image.getPixelAt(x,y);const int r=c.getRed(),g=c.getGreen(),b=c.getBlue();
+                if(b>g+40&&b>r)++purple;else if(r>b+40)++amber;}
+            return std::pair<int,int>{purple,amber};};
+        check(!w.showsLayer()&&count(0,100).first==0&&count(0,100).second>0,"Punch waveform without Punch 2 must stay plain Punch 1");
+        w.setLayer(p2,50,2,0);
+        check(w.showsLayer()&&std::abs(w.layerSplitMs()-50)<1e-9,"Punch 2 split must be ATTACK END % of the kept punch");
+        {const auto before=count(2,48),after=count(52,59),gone=count(62,98);
+         check(before.first==0&&before.second>0,"Punch 2 drawn before ATTACK END");
+         check(after.first>0&&after.second==0,"Punch 2 not purple after ATTACK END (or Punch 1 still drawn there)");
+         check(gone.first==0&&gone.second==0,"Unheard part after Punch 2 ends must stay empty");}
+        // + OFFSET moves Punch 2 right (later): a 60 ms Punch 2 at +30 ms ends at 90 ms.
+        w.setLayer(p2,50,2,30);
+        check(count(52,88).first>0&&count(92,98).first==0&&count(92,98).second==0,"PUNCH 2 OFFSET does not move Punch 2 to the right");
+        // Punch END trim 40 ms: 60 ms kept, ATTACK END at 50 % = 30 ms.
+        w.setGuideMilliseconds(40);w.setLayer(p2,50,2,0);
+        check(std::abs(w.layerSplitMs()-30)<1e-9&&count(2,28).first==0&&count(32,58).first>0,"ATTACK END does not follow the Punch END trim");
+        // TRANSITION 10 ms: both punches inside 25..35 ms, only Punch 1 before, only Punch 2 after.
+        w.setLayer(p2,50,10,0);
+        if(snapshot){w.setGuideMilliseconds(20);w.setLayer(p2,30,2,0);
+            juce::FileOutputStream out{juce::File(juce::String::fromUTF8(snapshot)).getSiblingFile(juce::File(juce::String::fromUTF8(snapshot)).getFileNameWithoutExtension()+"-punch2-wave.png")};
+            out.setPosition(0);out.truncate();check(juce::PNGImageFormat().writeImageToStream(w.createComponentSnapshot(w.getLocalBounds()),out),"Cannot render Punch 2 waveform snapshot");
+            w.setGuideMilliseconds(40);w.setLayer(p2,50,10,0);}
+        {const auto mid=count(26,34);check(mid.first>0&&mid.second>0&&count(36,58).second==0&&count(2,24).first==0,"TRANSITION overlap is not drawn where both punches play");}
+        w.setLayer(nullptr,50,2,0);check(!w.showsLayer()&&count(0,100).first==0,"Removing Punch 2 did not restore the plain view");
+        {auto tailOwner=std::make_unique<PunchTailWaveform>(false);tailOwner->setLayer(p2,50,2,0);check(!tailOwner->showsLayer(),"Only the Punch view shows Punch 2");}
+        std::cout<<"PASS Punch 2 on the Punch waveform: purple after ATTACK END, no unheard Punch 1, offset direction, END trim, transition, editor wiring\n";
+    }
     static void run(const char* snapshot) {
+        punch2Waveform(snapshot);
         {
             PunchTailKickDisplay d;d.setSize(810,225);
             pt::Sample p;p.left.assign(4800,.2f);p.right=p.left;

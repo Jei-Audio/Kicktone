@@ -5,6 +5,12 @@ same plugin (plugin code `TaA2`).
 A new version replaces the installed one, and projects from earlier versions
 open unchanged.
 
+## 0.5.33
+- With Punch 2 on, the PUNCH waveform shows Punch 2 in purple where it plays:
+  from ATTACK END on, moved by PUNCH 2 OFFSET. Punch 1 is drawn only up to
+  ATTACK END (inside TRANSITION you see both), so the picture matches what you
+  hear. It follows ATTACK END, TRANSITION, PUNCH 2 OFFSET and the Punch END trim.
+
 ## 0.5.32
 - The Final Kick waveform now follows ATTACK GAIN and DECAY GAIN while you drag
   them. The same goes for the other Punch-only controls: Punch Attack / Decay

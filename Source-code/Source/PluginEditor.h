@@ -129,6 +129,13 @@ public:
     // its marker is the shared CUT (caption drawn top-left).
     void setLockCaption(const juce::String& caption);
     const juce::String& lockCaptionText() const { return lockCaption; }
+    // v0.5.33 (Punch view): with the Punch layer on, Punch 2 is drawn in purple
+    // where it plays - from ATTACK END (split % of the kept punch) on, moved by
+    // PUNCH 2 OFFSET, untuned - and Punch 1 only up to ATTACK END (both inside the
+    // TRANSITION, where both are heard). No layer = the plain Punch 1 view.
+    void setLayer(std::shared_ptr<const PunchTailProcessor::Asset> layer,double splitPercent,double transitionMs,double offsetMs);
+    bool showsLayer() const { return isPunch && layerSample && !layerEnvelope.bins.empty(); }
+    double layerSplitMs() const;                       // ATTACK END in file time
     std::function<void(bool)> onEndGesture;
     std::function<void(double)> onEndTrim;
     std::function<void(bool)> onGesture;
@@ -168,8 +175,10 @@ private:
     void syncScroll();
     void keepVisible(double ms);
     void scrollBarMoved(juce::ScrollBar*,double start) override {viewStart=start;clampView();repaint();}
-    std::shared_ptr<const PunchTailProcessor::Asset> sample;
-    pt::WaveformEnvelope envelope;
+    std::shared_ptr<const PunchTailProcessor::Asset> sample, layerSample;
+    pt::WaveformEnvelope envelope, layerEnvelope;
+    double layerSplitPercent=20, layerTransitionMs=2, layerOffsetMs=0;
+    size_t envelopeBins() const { return zoomable()?size_t(1024)<<(kZoomSteps-1):size_t(1024); }
     double guideMs = 0.0, dragGuide=0, dragX=0, dragDuration=0;
     double endGuideMs = 0.0, endFadeMs = 10.0;
     juce::String lockCaption;

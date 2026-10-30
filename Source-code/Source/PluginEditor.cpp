@@ -20,7 +20,7 @@ void refreshThemeColours() {
 PunchTailWaveform::PunchTailWaveform(bool punchView, bool reverbView)
     : isPunch(punchView), isReverb(reverbView) {
     setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
-    setTooltip(punchView ? "Drag the END marker (or click) to choose where the punch stops. Hold Shift to move it slowly. Mouse wheel zooms in where you point, Shift + wheel scrolls, double-click zooms back out."
+    setTooltip(punchView ? "Drag the END marker (or click) to choose where the punch stops. Hold Shift to move it slowly. Mouse wheel zooms in where you point, Shift + wheel scrolls, double-click zooms back out. With Punch 2 on, the purple part is Punch 2: it takes over from ATTACK END."
                          : reverbView ? "Drag START to skip the beginning of the reverb file. The reverb always starts where the punch ends. Hold Shift to move it slowly."
                                       : "Drag the START marker (or click) to skip the beginning of the tail. Drag the END marker (bottom right) to make the dry tail shorter; it fades out over END FADE and the reverb keeps ringing. Hold Shift to move slowly. Mouse wheel zooms in where you point, Shift + wheel scrolls, double-click zooms back out.");
     // v0.4.61: zoom menu + scrollbar (Punch and Tail only).
@@ -129,12 +129,30 @@ void PunchTailWaveform::setSample(std::shared_ptr<const PunchTailProcessor::Asse
     sample = std::move(next);
     // v0.4.61: enough peak buckets for the deepest zoom (64 x 1024; never more than
     // one bucket per frame). Built here on the message thread, never in paint().
-    envelope = sample ? pt::buildWaveformEnvelope(sample->sample.left, sample->sample.right,
-                                                  zoomable()?size_t(1024)<<(kZoomSteps-1):size_t(1024))
+    envelope = sample ? pt::buildWaveformEnvelope(sample->sample.left, sample->sample.right, envelopeBins())
                       : pt::WaveformEnvelope{};
     if(zoom>1.0)viewStart=markerMs()-viewLengthMs()*.5;
     clampView();
     repaint();
+}
+
+void PunchTailWaveform::setLayer(std::shared_ptr<const PunchTailProcessor::Asset> layer,double splitPercent,double transitionMs,double offsetMs) {
+    if(!isPunch)layer.reset();
+    if(layer==layerSample && splitPercent==layerSplitPercent && transitionMs==layerTransitionMs && offsetMs==layerOffsetMs)return;
+    if(layer!=layerSample) {
+        layerSample=std::move(layer);
+        // Built here on the message thread, like the Punch 1 envelope; paint() only reads it.
+        layerEnvelope=layerSample?pt::buildWaveformEnvelope(layerSample->sample.left,layerSample->sample.right,envelopeBins())
+                                 :pt::WaveformEnvelope{};
+    }
+    layerSplitPercent=splitPercent;layerTransitionMs=transitionMs;layerOffsetMs=offsetMs;
+    repaint();
+}
+double PunchTailWaveform::layerSplitMs() const {
+    // Same point as the mix in PunchTailProcessor::rebuildPunch: split % of the
+    // punch that is kept (the file minus the Punch END trim), counted from 0.
+    const double kept=(std::max)(0.0,sampleMs()-(std::max)(0.0,guideMs));
+    return std::clamp(layerSplitPercent*.01,0.0,1.0)*kept;
 }
 
 void PunchTailWaveform::setLockCaption(const juce::String& caption) {
@@ -225,36 +243,58 @@ void PunchTailWaveform::paint(juce::Graphics& g) {
     }
     const double durationMs = sample->sample.duration() * 1000.0;
     const double viewMs = viewLengthMs();
-    // The waveform is scaled uniformly, retaining its relative dynamics.
-    const float gain = envelope.peak > 0.0000001f ? 1.0f / envelope.peak : 0.0f;
+    // The waveform is scaled uniformly, retaining its relative dynamics. With
+    // Punch 2 shown, both punches share one scale (they are mixed as they are).
+    const bool layerShown=showsLayer();
+    const float peak=layerShown?(std::max)(envelope.peak,layerEnvelope.peak):envelope.peak;
+    const float gain = peak > 0.0000001f ? 1.0f / peak : 0.0f;
     const float amp = plot.getHeight() * 0.46f;
     const float centre = plot.getCentreY();
-    {
-        // One min/max column per pixel over the visible slice of the bucket list.
-        g.saveState();g.reduceClipRegion(plot.toNearestInt().expanded(1,0));
-        const size_t count=envelope.bins.size();
+    // One min/max column per pixel over the visible slice of the bucket list.
+    // `env` is read at file time - shiftMs, only for file times fromMs..toMs.
+    const auto drawWave=[&](const pt::WaveformEnvelope& env,double envMs,double shiftMs,double fromMs,double toMs,juce::Colour colour) {
+        const size_t count=env.bins.size();
+        if(count==0 || envMs<=0)return;
         const int columns=(std::max)(2,int(std::ceil(plot.getWidth())));
-        const double binsPerMs=durationMs>0?double(count)/durationMs:0.0;
-        std::vector<float> tops(static_cast<size_t>(columns)),bottoms(static_cast<size_t>(columns));
+        const double binsPerMs=double(count)/envMs;
+        std::vector<float> tops,bottoms;std::vector<float> xs;
         for(int c=0;c<columns;++c) {
             const double ms0=viewStart+viewMs*double(c)/double(columns);
             const double ms1=viewStart+viewMs*double(c+1)/double(columns);
-            size_t first=size_t(std::clamp(std::floor(ms0*binsPerMs),0.0,double(count-1)));
-            size_t last=size_t(std::clamp(std::ceil(ms1*binsPerMs),double(first+1),double(count)));
-            float lo=envelope.bins[first].minimum,hi=envelope.bins[first].maximum;
-            for(size_t i=first+1;i<last;++i){lo=(std::min)(lo,envelope.bins[i].minimum);hi=(std::max)(hi,envelope.bins[i].maximum);}
-            tops[size_t(c)]=centre-hi*gain*amp;bottoms[size_t(c)]=centre-lo*gain*amp;
+            if(ms1<=fromMs || ms0>=toMs || ms1-shiftMs<=0 || ms0-shiftMs>=envMs)continue;
+            size_t first=size_t(std::clamp(std::floor((ms0-shiftMs)*binsPerMs),0.0,double(count-1)));
+            size_t last=size_t(std::clamp(std::ceil((ms1-shiftMs)*binsPerMs),double(first+1),double(count)));
+            float lo=env.bins[first].minimum,hi=env.bins[first].maximum;
+            for(size_t i=first+1;i<last;++i){lo=(std::min)(lo,env.bins[i].minimum);hi=(std::max)(hi,env.bins[i].maximum);}
+            xs.push_back(plot.getX()+plot.getWidth()*float(c)/float(columns-1));
+            tops.push_back(centre-hi*gain*amp);bottoms.push_back(centre-lo*gain*amp);
         }
+        if(xs.size()<2)return;
+        auto clip=plot.toNearestInt().expanded(1,0);
+        if(fromMs>-1.e300){const int x=juce::roundToInt(msToX(fromMs,plot));clip.setLeft((std::max)(clip.getX(),x));}
+        if(toMs<1.e300){const int x=juce::roundToInt(msToX(toMs,plot));clip.setRight((std::min)(clip.getRight(),x));}
+        if(clip.isEmpty())return;
+        g.saveState();g.reduceClipRegion(clip);
         juce::Path shape;
-        for(int c=0;c<columns;++c){const float x=plot.getX()+plot.getWidth()*float(c)/float(columns-1);
-            if(c==0)shape.startNewSubPath(x,tops[0]);else shape.lineTo(x,tops[size_t(c)]);}
-        for(int c=columns;c-->0;)shape.lineTo(plot.getX()+plot.getWidth()*float(c)/float(columns-1),bottoms[size_t(c)]);
+        for(size_t c=0;c<xs.size();++c){if(c==0)shape.startNewSubPath(xs[0],tops[0]);else shape.lineTo(xs[c],tops[c]);}
+        for(size_t c=xs.size();c-->0;)shape.lineTo(xs[c],bottoms[c]);
         shape.closeSubPath();
-        g.setColour(accent.withAlpha(0.65f));
+        g.setColour(colour.withAlpha(0.65f));
         g.fillPath(shape);
-        g.setColour(accent.withAlpha(0.98f));
+        g.setColour(colour.withAlpha(0.98f));
         g.strokePath(shape, juce::PathStrokeType(1.2f));
         g.restoreState();
+    };
+    constexpr double kAll=1.e301;
+    if(!layerShown) drawWave(envelope,durationMs,0.0,-kAll,kAll,accent);
+    else {
+        // v0.5.33: what the punch plays with the Punch layer on (see rebuildPunch's
+        // mix): Punch 1 until ATTACK END, Punch 2 after it; inside the TRANSITION
+        // both are heard. Punch 1 after the transition is not heard: not drawn.
+        const double splitMs=layerSplitMs();
+        const double fadeMs=(std::max)(layerTransitionMs,1000.0/(std::max)(1.0,sample->sample.rate));
+        drawWave(envelope,durationMs,0.0,-kAll,splitMs+fadeMs*.5,accent);
+        drawWave(layerEnvelope,layerSample->sample.duration()*1000.0,layerOffsetMs,splitMs-fadeMs*.5,kAll,tt::ui::pal().punch2);
     }
 
     // Trim overlays and handles use the original full sample duration.
@@ -1897,6 +1937,9 @@ void PunchTailEditor::timerCallback() {
             setParameter("trim",parts.base);setParameter("tailExtra",parts.extra);endGesture();}
     }
     punchWave.setSample(nextPunch);
+    // v0.5.33: Punch 2 in purple on the Punch waveform, where it plays.
+    punchWave.setLayer(punchLayerShown()?proc.asset(3):nullptr,proc.params.getRawParameterValue("punchRegionSplit")->load(),
+                       proc.params.getRawParameterValue("punchRegionTransition")->load(),proc.params.getRawParameterValue("punch2Offset")->load());
     tailWave.setSample(nextTail);
     reverbWave.setSample(nextReverb);
     // Re-render the displayed complete kick only on a file, bank or relevant
