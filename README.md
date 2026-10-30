@@ -1,5 +1,7 @@
 # Kicktone
 
+![Kicktone with a punch and a tail loaded](docs/kicktone.png)
+
 **A kick instrument for hardstyle, hardcore and other distorted kicks.**
 Load a punch and a tail. Kicktone pitches the tail across the keyboard, lines
 it up with the punch at every note and gives you one finished kick that you can
