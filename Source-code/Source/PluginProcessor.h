@@ -6,7 +6,7 @@
 #include "PitchDropSettings.h"
 #include "MasterEnvelope.h"
 #include "PitchBankPolicy.h"
-#include "PunchDetection.h"
+#include "SplitDetection.h"   // v0.5.36 DETECT END / DETECT START (includes PunchDetection.h)
 #include "PunchReverbDuck.h"
 #include "Distortion.h"
 #include "ParametricEQ.h"
@@ -33,6 +33,7 @@ public:
     juce::AudioProcessorValueTreeState params;
     juce::MidiKeyboardState keyboard;
     struct Asset { int trimFirst=0, trimLast=-1; double punchTimeScale=1; pt::Sample sample; pt::Pitch pitch; pt::PunchEndSuggestion punchEnd; juce::String name; juce::MemoryBlock bytes;
+        pt::TailStart tailStart;   // v0.5.36: Punch / Tail lanes, where the stable tail begins (DETECT START)
         pt::decaynote::Result decayNote;   // v0.5.5: measured on the prepared main punch (after ATTACK END)
         // Punches pitched with the tail, indexed by internal note - 15 (15..51).
         // v0.4.67: only 40..51 are filled unless PUNCH FOLLOWS TAIL is on.

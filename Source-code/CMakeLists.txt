@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Tailtone VERSION 0.5.35 LANGUAGES C CXX)
+project(Tailtone VERSION 0.5.36 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # v0.5.24: link the MSVC C++ runtime into every binary (/MT, /MTd for Debug), so
@@ -150,6 +150,9 @@ add_executable(TailtoneExtremeV5Tests Tests/ExtremeV5Tests.cpp)
 target_link_libraries(TailtoneExtremeV5Tests PRIVATE pt_r8brain)
 pt_sample_test(ExtremeV5Engine TailtoneExtremeV5Tests virus-kick-3.wav kick-nc-lol-2.0.wav tail.wav mpl-kick-merged.wav)   # v0.4.68: stub last cycle ("vector too long")
 # v0.5.13: AutoSplitTailStart removed with AUTO-SPLIT KICK (user request).
+# v0.5.36: Detect End / Detect Start (the tail start returns without AUTO-SPLIT).
+add_executable(TailtoneTailStartTests Tests/TailStartTests.cpp)
+pt_sample_test(TailStartDetection TailtoneTailStartTests virus-kick-3.wav kick-nc-lol-2.0.wav mpl-kick-merged.wav tail.wav punch.wav)
 if(PT_CORE_ONLY)
     return()
 endif()
@@ -217,7 +220,7 @@ target_sources(Tailtone PRIVATE Source/PluginProcessor.cpp Source/PluginEditor.c
 # by kRenderFormat there (bump it by hand).
 file(GLOB TT_RENDER_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.h"
      "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/r8brain/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/r8brain/*.inc")
-list(FILTER TT_RENDER_SOURCES EXCLUDE REGEX "/(PluginEditor|PluginProcessor|ParallelRender|Theme|UserDefaults|EQGraph|KickOverview|KickExport|PunchRegionWaveform|WaveformEdit|WaveformEnvelope|SpectralJoin|ProcessedPreview|PreparationProgress|PunchSplitTrim)\\.h$")
+list(FILTER TT_RENDER_SOURCES EXCLUDE REGEX "/(PluginEditor|PluginProcessor|ParallelRender|Theme|UserDefaults|EQGraph|KickOverview|KickExport|PunchRegionWaveform|WaveformEdit|WaveformEnvelope|SpectralJoin|ProcessedPreview|PreparationProgress|PunchSplitTrim|SplitDetection)\\.h$")
 list(SORT TT_RENDER_SOURCES)
 set(TT_RENDER_HASHES "")
 foreach(tt_file IN LISTS TT_RENDER_SOURCES)

@@ -1044,7 +1044,7 @@ PunchTailEditor::PunchTailEditor(PunchTailProcessor& p)
     content.addAndMakeVisible(tailWave);
     content.addAndMakeVisible(reverbWave);
     content.addAndMakeVisible(completedKick);
-    for (auto* button : {&punchButton, &tailButton, &reverbButton, &detectButton, &punchDetectButton}) content.addAndMakeVisible(button);
+    for (auto* button : {&punchButton, &tailButton, &reverbButton, &detectButton, &punchDetectButton, &tailDetectButton}) content.addAndMakeVisible(button);
     punchButton.onClick = [this] { browse(0); };
     tailButton.onClick = [this] { browse(1); };
     reverbButton.onClick = [this] { browse(2); };
@@ -1060,15 +1060,17 @@ PunchTailEditor::PunchTailEditor(PunchTailProcessor& p)
         button.onClick=[this,i]{proc.trimSilence(i);};
     }
     detectButton.onClick = [this] { proc.redetect(); };
+    // v0.5.36: Detect End / Detect Start in the Punch / Tail windows; their
+    // tooltips follow the loaded samples (updateDetectButtons).
     punchDetectButton.onClick=[this]{detectPunchEnd();};
-    punchDetectButton.setTooltip("Set PUNCH END to the spot where the hit turns into the tail (found when the sample was loaded). Fine-tune it with the END marker afterwards.");
+    tailDetectButton.onClick=[this]{detectTailStart();};
     // v0.4.66 LOCK SPLIT: while locked both waveforms show the whole split file
     // and their marker is the shared cut; the move is applied on release.
     content.addAndMakeVisible(lockSplitButton);
     lockSplitButton.setClickingTogglesState(true);
     lockSplitAttachment=std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(proc.params,"lockSplit",lockSplitButton);
     lockSplitButton.setTooltip("LOCK SPLIT: for one complete kick loaded into both Punch and Tail. Punch END and Tail START then move together "
-        "as one cut, so the join stays seamless: move either marker and the other follows. Detect Punch End jumps back to the detected cut. "
+        "as one cut, so the join stays seamless: move either marker and the other follows. Detect End and Detect Start jump back to the detected cut. "
         "Off: each marker only trims its own sample. Has no effect when Punch and Tail are different files.");
     punchWave.onGesture=[this](bool begin){if(begin)trimGesture(true);else endGesture();};
     tailWave.onGesture=[this](bool begin){if(begin)trimGesture(false);else endGesture();};
@@ -1100,7 +1102,7 @@ PunchTailEditor::PunchTailEditor(PunchTailProcessor& p)
         "The note the loaded tail plays, C2 to D#3 (FL Studio note names). Play pitched notes on keys D#2 to D#5; every key sounds one octave lower than its name, so the root C3 is played on key C4. If no clear note was detected, set this to the note you hear; pitching still works.",
         "Fine-tune the tail if it is slightly sharp or flat (100 cents = 1 semitone). Goes back to 0 when a note is detected.",
         "Skip the beginning of the tail. The range follows the length of the loaded file.",
-        "Cut the end of the punch away. You can also drag its END marker or use Detect Punch End.",
+        "Cut the end of the punch away. You can also drag its END marker or click Detect End in the Punch window.",
         "Moves the tail earlier (negative) or later (positive) where it meets the punch.",
         "How long the end of the punch and the start of the tail overlap and blend. The finished waveform shows the result.",
         "Punch volume.", "Tail volume.", "Overall volume of Kicktone. If the OUTPUT meter turns red, turn this down.",
@@ -1848,6 +1850,34 @@ void PunchTailEditor::detectPunchEnd() {
     setTrim(true,a->sample.duration()*1000.0-a->punchEnd.endMs);
     timerCallback();
 }
+// v0.5.36: Tail START to where the stable tail begins (0 ms in a tail without a
+// punch). With LOCK SPLIT both lanes hold the same sample and share one cut, so
+// this is Detect End: the cut moves to the detected tail start and the Tail
+// START follows CROSSFADE ms before it, as for every locked move.
+void PunchTailEditor::detectTailStart() {
+    if(lockedSplitActive()){detectPunchEnd();return;}
+    const auto a=proc.asset(1);if(!a || !a->tailStart.valid)return;
+    setTrim(false,a->tailStart.ms);
+    timerCallback();
+}
+void PunchTailEditor::updateDetectButtons() {
+    const auto& p=displayed[0];const auto& t=displayed[1];
+    const auto ms=[](double v){return juce::String(v,1)+" ms";};
+    const bool locked=lockedSplitActive();
+    const juce::String lockNote=locked?" LOCK SPLIT is on: Detect End and Detect Start both move the shared cut.":"";
+    punchDetectButton.setEnabled(p && p->punchEnd.valid);
+    punchDetectButton.setTooltip(!p ? juce::String("Detect End: finds where the punch turns into the tail and moves the END marker there. Load a punch first.")
+        : !p->punchEnd.valid ? juce::String("Detect End: no spot where the punch turns into a tail was found in this sample (a punch on its own, for example). Drag the END marker by hand.")
+        : "Detect End: the punch ends at "+ms(p->punchEnd.endMs)+(p->tailStart.valid && p->tailStart.punch ? ", where the steady tail of this sample begins." : ", where the hit dies down.")
+          +" Click to move the END marker there, then fine-tune it by dragging."+lockNote);
+    tailDetectButton.setEnabled(locked ? p && p->punchEnd.valid : t && t->tailStart.valid);
+    tailDetectButton.setTooltip(locked ? (p && p->punchEnd.valid ? "Detect Start: moves the cut to "+ms(p->punchEnd.endMs)+", where the punch ends and the tail begins."+lockNote
+                                                                  : juce::String("Detect Start: no spot where the punch turns into a tail was found in this sample. Drag the START marker by hand."))
+        : !t ? juce::String("Detect Start: finds where the tail begins and moves the START marker there. Load a tail first.")
+        : !t->tailStart.valid ? juce::String("Detect Start: no steady tail was found in this sample. Drag the START marker by hand.")
+        : !t->tailStart.punch ? juce::String("Detect Start: this sample has no punch before its tail, so the tail begins at 0 ms. Click to move the START marker back to the beginning.")
+        : "Detect Start: the tail begins at "+ms(t->tailStart.ms)+", the first steady cycle after the punch. Click to move the START marker there, then fine-tune it by dragging.");
+}
 
 void PunchTailEditor::browse(int slot) {
     chooser = std::make_unique<juce::FileChooser>(slot == 0 ? "Choose punch" : slot == 1 ? "Choose tail" : slot == 3 ? "Choose punch 2" : "Choose reverb", juce::File{}, "*.wav;*.mp3");
@@ -1977,10 +2007,7 @@ void PunchTailEditor::timerCallback() {
         slider.setRange(0,maximum,.1);slider.setValue(previewParams[size_t(i==10?12:i)],juce::dontSendNotification);slider.setEnabled(bool(a));
     }
     syncingTrimControls=false;
-    punchDetectButton.setEnabled(displayed[0] && displayed[0]->punchEnd.valid);
-    if(displayed[0])punchDetectButton.setTooltip(displayed[0]->punchEnd.valid
-        ? "Suggested punch end: " + juce::String(displayed[0]->punchEnd.endMs,1) + " ms. Click to use it, then fine-tune by dragging the END marker."
-        : "No clear spot where the punch turns into the tail was found. Drag the punch END marker by hand.");
+    updateDetectButtons();   // v0.5.36
     auto nextBank = proc.previewBank();
     const auto nextPreparedPunch=proc.previewPunch();
     const auto nextTailWet=proc.previewTailWet(juce::jlimit(0,127,juce::roundToInt(previewParams[0])));
@@ -2606,8 +2633,13 @@ void PunchTailEditor::applyLayout() {
         place(expandWave[size_t(i)],x+width-77,77,69,25);
         place(*loads[i],x+8,109,width-102,25);place(unloadButtons[size_t(i)],x+width-86,109,78,25);
         place(*waves[i],x+8,141,width-16,i==waveFocus?180:120);
-        place(sourceNames[size_t(i)],x+8,265+extra,width-(i<2?116:16),20);
-        if(i<2)place(trimButtons[size_t(i)],x+width-105,263+extra,97,24);
+        // v0.5.36: name | Detect End/Start | Trim. Beside an expanded window the
+        // buttons narrow to 90 px (still one line of text) and the name hides.
+        const int buttonW=width<300?90:97,nameW=i<2?width-24-2*buttonW:width-16;
+        place(sourceNames[size_t(i)],x+8,265+extra,(std::max)(0,nameW),20);
+        if(nameW<40)sourceNames[size_t(i)].setVisible(false);
+        if(i<2){place(trimButtons[size_t(i)],x+width-8-buttonW,263+extra,buttonW,24);
+            place(i==0?punchDetectButton:tailDetectButton,x+width-12-2*buttonW,263+extra,buttonW,24);}
         if(i==2) {
             reverbFold.setButtonText(reverbMinimized?"Show":"-");
             place(reverbFold,reverbMinimized?x+8:x+width-109,reverbMinimized?109:77,reverbMinimized?width-16:26,25);
@@ -2625,7 +2657,8 @@ void PunchTailEditor::applyLayout() {
     place(punch2Load,872,300+extra,118,26);place(punch2Unload,996,300+extra,107,26);
     const int detection=297+extra+layerRow;
     // v0.5.13: AUTO-SPLIT KICK removed (user request); the pitch label takes its room.
-    place(punchDetectButton,28,detection,173,27);place(pitchLabel,211,detection,562,27);
+    // v0.5.36: Detect End moved into the Punch window; the pitch label starts the row.
+    place(pitchLabel,28,detection,745,27);
     place(lockSplitButton,783,detection,139,27);   // v0.4.66
     place(detectButton,932,detection,179,27);
     const int heading=detection+38,controlsY=heading+24;

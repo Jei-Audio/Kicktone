@@ -17,6 +17,8 @@ First start
    Find installed plugins. Kicktone is listed as an instrument (Jei Audio).
 2. Load a punch and a tail: drag WAV or MP3 files onto the Punch and Tail
    panels, or use their Load buttons.
+   Using one complete kick for both? Load it into both panels, then click
+   Detect End (Punch) and Detect Start (Tail).
 3. Check TAIL ROOT (the note of the tail; Kicktone detects it when the tail
    loads), then play MIDI notes. The Final Kick waveform shows what you hear; EXPORT WAV or
    DRAG takes the finished kick out.

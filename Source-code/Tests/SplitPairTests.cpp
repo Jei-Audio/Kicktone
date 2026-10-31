@@ -28,6 +28,12 @@ int main(int argc,char** argv) try {
     auto punch=p.asset(0),tail=p.asset(1);
     ck(PunchTailProcessor::isSplitPair(punch.get(),tail.get()),"the same file in both lanes must form a split pair");
     ck(punch->bytes==tail->bytes&&punch->sample.left==tail->sample.left,"lanes must hold the same audio");
+    // v0.5.36 Detect End / Detect Start: measured on the worker at load, in both lanes.
+    {const auto expected=pt::detectTailStart(punch->sample);
+     ck(expected.valid&&expected.punch&&expected.ms>85&&expected.ms<100,"virus-kick-3: tail start not found");
+     ck(punch->tailStart.valid&&punch->tailStart.punch&&punch->tailStart.ms==expected.ms,"Punch lane: tail start not measured at load");
+     ck(tail->tailStart.valid&&tail->tailStart.ms==expected.ms,"Tail lane: tail start not measured at load");
+     ck(punch->punchEnd.valid&&punch->punchEnd.endMs==expected.ms,"Punch lane: Detect End must end the punch where the tail begins");}
     juce::Thread::sleep(100);
     ck(value(p,"punchOffset")==120&&value(p,"trim")==35&&value(p,"punchExtra")==0&&value(p,"tailExtra")==0,"loading the same kick twice must not move any trim (no AUTO-SPLIT)");
     ck(!p.lockSplitOn(),"loading the same kick twice must not switch LOCK SPLIT on");
@@ -39,7 +45,8 @@ int main(int argc,char** argv) try {
      for(int i=0;i<30000;++i){if(restored.asset(0)&&restored.asset(1))break;juce::Thread::sleep(1);}
      auto rp=restored.asset(0),rt=restored.asset(1);
      ck(rp&&rt&&PunchTailProcessor::isSplitPair(rp.get(),rt.get())&&rp->sample.left==punch->sample.left,"split pair did not survive a project round trip");
-     ck(restored.lockSplitOn()&&value(restored,"punchOffset")==120&&value(restored,"trim")==35,"LOCK SPLIT / trims did not survive a project round trip");}
+     ck(restored.lockSplitOn()&&value(restored,"punchOffset")==120&&value(restored,"trim")==35,"LOCK SPLIT / trims did not survive a project round trip");
+     ck(rp->punchEnd.endMs==punch->punchEnd.endMs&&rt->tailStart.ms==tail->tailStart.ms&&rt->tailStart.valid,"a reopened project must detect the same punch end / tail start");}
     // Unloading one lane leaves the other alone; one lane is no pair.
     p.unloadFile(1);for(int i=0;i<2000&&p.asset(1);++i)juce::Thread::sleep(1);
     ck(!p.asset(1)&&p.asset(0)==punch,"unload touched the other lane");
@@ -47,6 +54,7 @@ int main(int argc,char** argv) try {
     // A Tail from another file is no split pair.
     p.loadFile(1,other);waitFor(p,1,other.getFileName());
     ck(!PunchTailProcessor::isSplitPair(p.asset(0).get(),p.asset(1).get()),"different files must not form a split pair");
-    std::cout<<"PASS split pair: manual double load, no auto-split side effects, round trip with LOCK SPLIT, unload, different files\n";
+    {const auto t=p.asset(1)->tailStart;ck(t.valid&&t.punch&&t.ms>125&&t.ms<145,"kick-nc-lol-2.0 in the Tail lane: tail start not measured");}
+    std::cout<<"PASS split pair: manual double load, no auto-split side effects, round trip with LOCK SPLIT, unload, different files, tail start / punch end measured at load\n";
     return 0;
 } catch(const std::exception& e){std::cerr<<"FAILED: "<<e.what()<<'\n';return 1;}

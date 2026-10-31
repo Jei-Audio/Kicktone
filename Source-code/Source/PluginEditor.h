@@ -417,7 +417,9 @@ private:
     juce::Component content; // Single logical canvas, scaled exactly once
     TailtoneLookAndFeel theme;
     juce::TooltipWindow tooltips {this, 700};
-    juce::TextButton punchButton {"Load punch"}, tailButton {"Load tail"}, reverbButton {"Load reverb"}, detectButton {"Use detected note"}, punchDetectButton {"Detect Punch End"};
+    juce::TextButton punchButton {"Load punch"}, tailButton {"Load tail"}, reverbButton {"Load reverb"}, detectButton {"Use detected note"};
+    // v0.5.36: one detect button in each of the Punch and Tail windows, beside Trim.
+    juce::TextButton punchDetectButton {"Detect End"}, tailDetectButton {"Detect Start"};
     // v0.4.66: Punch END and Tail START move together (one shared cut).
     juce::TextButton lockSplitButton {"LOCK SPLIT"};
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> lockSplitAttachment;
@@ -702,6 +704,8 @@ private:
     double lockedCutTarget(bool& changed) const; // Tail START for the current cut
     void setReverbTrim(double ms);
     void detectPunchEnd();
+    void detectTailStart();   // v0.5.36
+    void updateDetectButtons();   // v0.5.36: enable + tooltips of both detect buttons
     void browse(int);
     friend struct PunchTailEditorTest;
     void timerCallback() override;

@@ -39,6 +39,8 @@ unchanged.
 - 37 pitched tail keys (D#2 to D#5). Tail engines: Highest Fidelity v4
   (default), Adaptive Stretch v4 and Extreme v5. Stretch from 80 % to 150 %.
 - Detects the tail's root note automatically; you can set it by hand.
+- Detect End / Detect Start find where the punch ends and the tail begins in
+  each loaded sample, so one complete kick can feed both lanes.
 - The punch can stay put, follow the tail's pitch, or play a third or a fifth
   above it (Punch Harmony). Punch pitch modes: Stretch Aligned, Resample and
   Highest Fidelity.

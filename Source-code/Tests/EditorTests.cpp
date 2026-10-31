@@ -112,7 +112,7 @@ struct PunchTailEditorTest {
         check(get("crossfade")==8,"crossfade default changed");
         setP("trim",0);setP("punchOffset",480);e.timerCallback();
         check(e.lockedPair && !e.lockedSplitActive() && e.punchWave.lockCaptionText().isEmpty() && tailMs()==0,"unlocked pair must stay independent");
-        check(e.lockSplitButton.isVisible()&&e.lockSplitButton.getY()==e.punchDetectButton.getY()&&e.lockSplitButton.getX()>e.pitchLabel.getRight()&&
+        check(e.lockSplitButton.isVisible()&&e.lockSplitButton.getY()==e.pitchLabel.getY()&&e.lockSplitButton.getX()>e.pitchLabel.getRight()&&
               e.lockSplitButton.getRight()<e.detectButton.getX()&&e.content.getLocalBounds().contains(e.lockSplitButton.getBounds()),"LOCK SPLIT button placement");
         e.lockSplitButton.setToggleState(true,juce::sendNotificationSync);
         check(p.lockSplitOn(),"LOCK SPLIT button is not bound to the lockSplit parameter");
@@ -144,7 +144,12 @@ struct PunchTailEditorTest {
         e.controls[2].slider.setValue(150,juce::sendNotificationSync);oneCut(158,"TAIL OFFSET knob did not move the shared cut");
         e.completedKick.onGesture(pt::KickHandle::punchEnd,true);check(e.gestureParams.size()==4,"Final Kick END gesture must cover all four trims");
         e.completedKick.onEdit(pt::KickHandle::punchEnd,D-90);e.completedKick.onGesture(pt::KickHandle::punchEnd,false);oneCut(90,"Final Kick END handle did not move the shared cut");
-        e.punchDetectButton.onClick();oneCut(50,"Detect Punch End did not return the shared cut to the detected cut");
+        e.punchDetectButton.onClick();oneCut(50,"Detect End did not return the shared cut to the detected cut");
+        // v0.5.36: locked, Detect Start moves the same shared cut (the Tail START CROSSFADE before it).
+        e.punchWave.onTrim(D-150);oneCut(150,"Punch END drag before Detect Start");e.timerCallback();
+        check(e.tailDetectButton.isEnabled()&&e.tailDetectButton.getTooltip().contains("LOCK SPLIT")&&e.punchDetectButton.getTooltip().contains("LOCK SPLIT"),"locked Detect buttons must say they share the cut");
+        e.tailDetectButton.onClick();oneCut(50,"Detect Start (locked) did not move the shared cut to the detected cut");
+        check(e.gestureParams.empty(),"Detect Start left a gesture open");
         // A CROSSFADE change keeps the cut and moves the Tail START with it.
         setP("crossfade",12);e.timerCallback();oneCut(50,"CROSSFADE change did not re-align the locked Tail START");
         check(std::abs(tailMs()-38)<.051,"Tail START is not CROSSFADE before the cut");
@@ -160,7 +165,7 @@ struct PunchTailEditorTest {
         setP("lockSplit",1);PunchTailSplitTest::pair(p,"another file");e.timerCallback();
         check(!e.lockedPair && !e.lockedSplitActive() && e.tailWave.lockCaptionText().isEmpty(),"different files must not lock");
         e.tailWave.onTrim(80);check(std::abs(tailMs()-80)<.051 && punchMs()==punchBefore,"different files: trims must stay independent");
-        std::cout<<"PASS LOCK SPLIT editor: shared cut both ways, one gesture, mouse drag, clamps, knobs, Final Kick handle, Detect, unlock, different files\n";
+        std::cout<<"PASS LOCK SPLIT editor: shared cut both ways, one gesture, mouse drag, clamps, knobs, Final Kick handle, Detect End / Start, unlock, different files\n";
     }
     // v0.5.33: Punch 2 drawn in purple on the Punch waveform where it plays;
     // Punch 1 only up to ATTACK END (no faint copy of the unheard part).
@@ -286,6 +291,83 @@ struct PunchTailEditorTest {
          check(kinds(r,2,27).dark==0,"Reverb view must keep its old dimmed look");}
         std::cout<<"PASS unplayed Punch / Tail waveform parts are dark grey (Punch END, Punch 2, Tail START and END cut), Reverb unchanged\n";
     }
+    // v0.5.36: sample name | Detect End / Detect Start | Trim, inside each window.
+    static void checkSourceRow(PunchTailEditor& e) {
+        for(int i=0;i<2;++i){auto& d=i?e.tailDetectButton:e.punchDetectButton;auto& trim=e.trimButtons[size_t(i)];auto& name=e.sourceNames[size_t(i)];
+            check(d.isVisible()&&e.sourcePanels[size_t(i)].contains(d.getBounds())&&e.sourcePanels[size_t(i)].contains(trim.getBounds()),"Detect / Trim outside its window");
+            check(d.getY()==trim.getY()&&d.getRight()<trim.getX()&&name.getRight()<=d.getX()&&d.getWidth()==trim.getWidth(),"Detect / Trim / sample name overlap");
+            check(name.isVisible()==(name.getWidth()>=40)&&(name.isVisible()||e.sourcePanels[size_t(i)].getWidth()<300),"sample name hidden in a normal window, or squeezed to a stub");
+            // Both texts fit on one line, as LookAndFeel_V2::drawButtonText lays them out.
+            for(juce::TextButton* b:{&d,&trim}){
+                const juce::Font font((std::min)(16.0f,float(b->getHeight())*.6f));
+                const int indent=(std::min)(juce::roundToInt(font.getHeight()*.6f),2+(std::min)(b->getHeight(),b->getWidth())/2/2);
+                const float text=font.getStringWidthFloat(b->getButtonText()),room=float(b->getWidth()-2*indent);
+                if(text>room)std::cerr<<b->getButtonText()<<": "<<text<<" px text, "<<room<<" px room\n";
+                check(text<=room,"Detect / Trim button text does not fit");}}
+    }
+    // v0.5.36 (user request): Detect End in the Punch window, Detect Start in the
+    // Tail window, each moving only its own marker to the detected spot.
+    static void detectButtons(const char* snapshot) {
+        auto owner=std::make_unique<PunchTailProcessor>();auto& p=*owner;PunchTailPlaybackTest::setup(p);
+        // Complete 808-style kicks (noise click, 200 -> 50 Hz drop), a different file per lane.
+        const auto kick=[](double tau,const char* bytes){auto a=std::make_shared<PunchTailProcessor::Asset>();auto& s=a->sample;s.rate=44100;
+            uint32_t seed=3;double phase=0;
+            for(int i=0;i<int(s.rate*.8);++i){const double t=i/s.rate,f=50+150*std::exp(-t/tau);phase+=2*pt::pi*f/s.rate;seed=1664525u*seed+1013904223u;
+                double x=.8*std::sin(phase)*std::exp(-t/.5);if(t<.005)x+=.3*(double(seed)/4294967295.*2-1);
+                s.left.push_back(float(x));s.right.push_back(float(x*.98));}
+            a->name=juce::String(bytes)+".wav";a->bytes=juce::MemoryBlock(bytes,std::strlen(bytes));a->trimFirst=0;a->trimLast=int(s.left.size());
+            a->tailStart=pt::detectTailStart(s);a->punchEnd=pt::suggestPunchEnd(s,a->tailStart);return a;};
+        const auto a=kick(.015,"kick a"),b=kick(.025,"kick b");
+        check(a->tailStart.valid&&a->tailStart.punch&&b->tailStart.valid&&b->tailStart.punch&&std::abs(a->tailStart.ms-b->tailStart.ms)>5,"fixture kicks need a punch and a tail");
+        PunchTailPlaybackTest::setAsset(p,0,a);PunchTailPlaybackTest::setAsset(p,1,b);
+        auto get=[&](const char* id){return double(p.params.getRawParameterValue(id)->load());};
+        auto setP=[&](const char* id,double v){auto* q=p.params.getParameter(id);q->setValueNotifyingHost(q->convertTo0to1(float(v)));};
+        auto punchMs=[&]{return get("punchOffset")+get("punchExtra");};
+        auto tailMs=[&]{return get("trim")+get("tailExtra");};
+        setP("punchOffset",0);setP("punchExtra",0);setP("trim",0);setP("tailExtra",0);
+        auto editorOwner=std::make_unique<PunchTailEditor>(p);auto& e=*editorOwner;e.timerCallback();
+        check(!e.lockedPair&&!e.lockedSplitActive(),"different files must not lock");
+        check(e.punchDetectButton.getButtonText()=="Detect End"&&e.tailDetectButton.getButtonText()=="Detect Start","Detect button names");
+        check(e.punchDetectButton.isEnabled()&&e.tailDetectButton.isEnabled(),"Detect buttons must be on with a punch + tail in both windows");
+        checkSourceRow(e);
+        const double D0=a->sample.duration()*1000;
+        // Detect End: the Punch END marker goes where the Punch sample's tail begins; the Tail is untouched.
+        check(e.punchDetectButton.getTooltip().contains(juce::String(a->tailStart.ms,1)+" ms")&&e.punchDetectButton.getTooltip().contains("steady tail"),"Detect End tooltip must name the detected time");
+        e.punchDetectButton.onClick();
+        check(std::abs(D0-punchMs()-a->tailStart.ms)<.051,"Detect End did not move the Punch END to where the tail begins");
+        check(tailMs()==0&&e.gestureParams.empty(),"Detect End moved the Tail START or left a gesture open");
+        // Detect Start: the Tail START marker goes where the Tail sample's tail begins; the Punch is untouched.
+        check(e.tailDetectButton.getTooltip().contains(juce::String(b->tailStart.ms,1)+" ms"),"Detect Start tooltip must name the detected time");
+        e.tailDetectButton.onClick();
+        check(std::abs(tailMs()-b->tailStart.ms)<.051,"Detect Start did not move the Tail START to where the tail begins");
+        check(std::abs(D0-punchMs()-a->tailStart.ms)<.051&&e.gestureParams.empty(),"Detect Start moved the Punch END or left a gesture open");
+        e.timerCallback();
+        check(std::abs(e.punchWave.guideMs-(D0-a->tailStart.ms))<.051&&std::abs(e.tailWave.guideMs-b->tailStart.ms)<.051,"markers are not at the detected spots");
+        if(snapshot){refresh(e);juce::FileOutputStream out{juce::File(juce::String::fromUTF8(snapshot)).getSiblingFile(juce::File(juce::String::fromUTF8(snapshot)).getFileNameWithoutExtension()+"-detect.png")};
+            out.setPosition(0);out.truncate();check(juce::PNGImageFormat().writeImageToStream(e.createComponentSnapshot(e.getLocalBounds()),out),"Cannot render detect snapshot");}
+        // A tail without a punch: Detect Start returns the START marker to 0 ms.
+        {auto t=std::make_shared<PunchTailProcessor::Asset>(*b);t->sample.left.clear();t->sample.right.clear();double phase=0;
+         for(int i=0;i<22050;++i){phase+=2*pt::pi*48/44100.;const float v=float(.7*std::tanh(4*std::sin(phase))*std::exp(-i/35280.));t->sample.left.push_back(v);t->sample.right.push_back(v);}
+         t->bytes=juce::MemoryBlock("tail only",9);t->tailStart=pt::detectTailStart(t->sample);
+         check(t->tailStart.valid&&!t->tailStart.punch,"tail fixture must have no punch");
+         PunchTailPlaybackTest::setAsset(p,1,t);setP("trim",100);e.timerCallback();
+         check(e.tailDetectButton.isEnabled()&&e.tailDetectButton.getTooltip().contains("no punch"),"Detect Start must offer 0 ms for a tail without a punch");
+         e.tailDetectButton.onClick();check(tailMs()==0,"Detect Start did not return a punchless tail to 0 ms");}
+        // A punch without a tail: Detect Start is off and says why.
+        {auto t=std::make_shared<PunchTailProcessor::Asset>(*b);t->sample.left.assign(13230,0.f);
+         for(size_t i=0;i<1764;++i)t->sample.left[i]=float(std::sin(2*pt::pi*(60+140*std::exp(-double(i)/441.))*double(i)/44100.)*(1-double(i)/1764.));
+         t->sample.right=t->sample.left;t->bytes=juce::MemoryBlock("punch only",10);t->tailStart=pt::detectTailStart(t->sample);
+         check(!t->tailStart.valid,"punch fixture must have no tail");
+         PunchTailPlaybackTest::setAsset(p,1,t);setP("trim",30);e.timerCallback();
+         check(!e.tailDetectButton.isEnabled()&&e.tailDetectButton.getTooltip().contains("no steady tail"),"Detect Start must be off when no tail was found");
+         e.tailDetectButton.onClick();   // the handler itself must refuse, too
+         check(std::abs(tailMs()-30)<.051,"Detect Start without a tail must not move the marker");}
+        // Empty windows: both off.
+        e.unloadButtons[0].onClick();e.unloadButtons[1].onClick();e.timerCallback();
+        check(!e.punchDetectButton.isEnabled()&&!e.tailDetectButton.isEnabled()&&e.punchDetectButton.getTooltip().contains("Load a punch first")&&e.tailDetectButton.getTooltip().contains("Load a tail first"),
+              "Detect buttons must be off without samples");
+        std::cout<<"PASS Detect End / Detect Start: in the Punch / Tail windows beside Trim, each moves only its own marker, tail without a punch -> 0 ms, no tail -> off, empty -> off\n";
+    }
     static void run(const char* snapshot) {
         punch2Waveform(snapshot);   // builds an editor first (loads the theme colours)
         unplayedDark(snapshot);
@@ -323,6 +405,7 @@ struct PunchTailEditorTest {
             for(const auto& c:d.joinControls)check(d.getLocalBounds().contains(c.getBounds()),"Join controls clipped");
         }
         lockSplit(snapshot);
+        detectButtons(snapshot);   // v0.5.36
         auto processor=std::make_unique<PunchTailProcessor>();auto& p=*processor;PunchTailPlaybackTest::setup(p);
         auto editor=std::make_unique<PunchTailEditor>(p);auto& e=*editor;
         check(e.reverbMinimized && !e.reverbWave.isVisible() && e.reverbFold.isVisible(),"Reverb must start minimized");
@@ -543,7 +626,7 @@ struct PunchTailEditorTest {
              out.setPosition(0);out.truncate();check(juce::PNGImageFormat().writeImageToStream(e.createComponentSnapshot(e.getLocalBounds()),out),"Cannot render Punch 2 snapshot");e.selectLayer(1);e.timerCallback();}
          check(e.baseHeight>=before&&e.baseHeight<=before+40,"Punch 2 row changed height unexpectedly");
          check(e.keys.getBottom()+20==e.baseHeight,"Punch 2 row clips or leaves blank space");
-         check(e.punch2Panel.getBottom()<e.punchDetectButton.getY()&&e.content.getLocalBounds().contains(e.punch2Load.getBounds()),"Punch 2 row overlaps detection row");
+         check(e.punch2Panel.getBottom()<e.pitchLabel.getY()&&e.content.getLocalBounds().contains(e.punch2Load.getBounds()),"Punch 2 row overlaps detection row");   // v0.5.36: the pitch label starts that row
          e.punchLayer.setToggleState(false,juce::sendNotificationSync);e.timerCallback();
          check(value("punchLayer")==0&&!e.punch2Load.isVisible()&&!e.punch2Pitch.isVisible()&&e.baseHeight==before,"Unticking Punch layer did not hide Punch 2");
          check(e.dropSlotAt(e.punch2Panel.getCentreX(),e.punch2Panel.getCentreY())!=3,"Hidden Punch 2 row still takes drops");}
@@ -1095,7 +1178,12 @@ struct PunchTailEditorTest {
             check(e.eqGraph.isVisible()==!e.collapsed[2],"EQ fold did not hide inspector");
             check(value("transientOn")==effectBefore,"Folding changed the audio effect");
             if(focus>=0){juce::Component* waves[]={&e.punchWave,&e.tailWave,&e.reverbWave};check(waves[focus]->getWidth()>500,"Focused waveform did not expand");}
+            checkSourceRow(e);
         }
+        // v0.5.36: also with the Reverb window shown (narrowest Punch / Tail windows).
+        e.reverbMinimized=false;
+        for(int focus=-1;focus<3;++focus){e.waveFocus=focus;e.resizeLayout();checkSourceRow(e);}
+        e.reverbMinimized=true;
         e.waveFocus=1;e.collapsed={true,false,true};e.showDistortionPage(1);e.saveLayout();e.resizeLayout();
         { auto reopenedOwner=std::make_unique<PunchTailEditor>(p);auto& reopened=*reopenedOwner;
           check(reopened.selectedLayer==2&&reopened.waveFocus==1&&reopened.collapsed[0]&&reopened.collapsed[2]&&reopened.distortionPage==1,
@@ -1388,10 +1476,11 @@ struct PunchTailEditorTest {
          auto& r=e.reverbWave;r.mouseWheelMove(event(r,{60,55}),up);check(r.zoomFactor()==1,"the Reverb waveform must not zoom");
          e.punchWave.mouseWheelMove(event(e.punchWave,{x,55}),up);check(e.punchWave.zoomFactor()==2,"Punch waveform wheel zoom");e.punchWave.setZoomIndex(0);}
         // v0.5.13: AUTO-SPLIT KICK removed (user request). The detection row is
-        // Detect Punch End | pitch label | LOCK SPLIT | Use detected note, and a
-        // single file dropped on the Final Kick Waveform no longer auto-splits.
-        {check(e.pitchLabel.getY()==e.punchDetectButton.getY()&&e.pitchLabel.getX()>e.punchDetectButton.getRight()&&e.pitchLabel.getRight()<e.lockSplitButton.getX()&&
-               e.lockSplitButton.getRight()<e.detectButton.getX(),"Detection row order / overlap");
+        // pitch label | LOCK SPLIT | Use detected note (v0.5.36: Detect End moved
+        // into the Punch window), and a single file dropped on the Final Kick
+        // Waveform no longer auto-splits.
+        {check(e.pitchLabel.getY()==e.lockSplitButton.getY()&&e.pitchLabel.getY()==e.detectButton.getY()&&e.pitchLabel.getRight()<e.lockSplitButton.getX()&&
+               e.lockSplitButton.getRight()<e.detectButton.getX()&&!e.pitchLabel.getBounds().intersects(e.punchDetectButton.getBounds()),"Detection row order / overlap");
          check(e.content.getLocalBounds().contains(e.detectButton.getBounds())&&e.content.getLocalBounds().contains(e.pitchLabel.getBounds()),"Detection row clipped");
          for(auto* c:e.content.getChildren())if(auto* b=dynamic_cast<juce::Button*>(c))check(!b->getButtonText().containsIgnoreCase("AUTO-SPLIT"),"An AUTO-SPLIT button is still in the editor");
          const auto k=e.completedKick.getBounds().getCentre();check(e.dropSlotAt(k.x,k.y)>=0&&e.dropSlotAt(k.x,k.y)<=2,"A drop on the Final Kick Waveform must load an ordinary lane");}

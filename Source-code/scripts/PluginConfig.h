@@ -45,9 +45,9 @@
 #define JucePlugin_PluginCode 0x54614132
 #define JucePlugin_Name "Kicktone"
 #define JucePlugin_Desc "Kicktone"
-#define JucePlugin_Version 0.5.35
-#define JucePlugin_VersionString "0.5.35"
-#define JucePlugin_VersionCode 0x523
+#define JucePlugin_Version 0.5.36
+#define JucePlugin_VersionString "0.5.36"
+#define JucePlugin_VersionCode 0x524
 #define JucePlugin_CFBundleIdentifier audio.jei.tailtone
 #define JucePlugin_VSTUniqueID JucePlugin_PluginCode
 #define JucePlugin_VSTCategory kPlugCategSynth

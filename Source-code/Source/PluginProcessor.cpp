@@ -1180,7 +1180,9 @@ void PunchTailProcessor::run() {
             }
             loaded->trimFirst=first;loaded->trimLast=last;
             if(slot==1 && (first!=0 || last!=fullCount))loaded->pitch=pt::refinedTailPitch(loaded->sample);
-            if(slot==0) loaded->punchEnd=pt::detectPunchEnd(loaded->sample);
+            // v0.5.36 DETECT START / DETECT END: where the tail begins and the punch ends.
+            if(slot<2) loaded->tailStart=pt::detectTailStart(loaded->sample);
+            if(slot==0) loaded->punchEnd=pt::suggestPunchEnd(loaded->sample,loaded->tailStart);
             const juce::ScopedLock requestGuard(requestLock);
             if(req.generation!=requestGenerations[size_t(slot)]) continue;
             if(slot==1 && !req.fromState) applyPitch(loaded->pitch);

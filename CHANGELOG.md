@@ -5,6 +5,17 @@ same plugin (plugin code `TaA2`).
 A new version replaces the installed one, and projects from earlier versions
 open unchanged.
 
+## 0.5.36
+- New **Detect End** button in the PUNCH window and **Detect Start** button in
+  the TAIL window, next to Trim. Detect End moves the punch END marker to where
+  the punch turns into the tail; Detect Start moves the tail START marker to
+  where the steady tail begins. In a complete kick the punch keeps its attack
+  and its decay. A tail with no punch in front of it starts at 0 ms. With LOCK
+  SPLIT on, both buttons move the shared cut.
+- The old Detect Punch End button under the windows is gone (Detect End
+  replaces it). On a complete kick it now finds the end of the whole punch
+  instead of only the attack.
+
 ## 0.5.35
 - On the PUNCH and TAIL waveforms, the parts you don't hear (after the Punch
   END, before the Tail START, after the Tail END cut) are now drawn dark grey
